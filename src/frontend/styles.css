@@ -1,0 +1,197 @@
+/* 🎨 Vibrant Premium UI Styles */
+
+/* Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+/* Theme variables – feel free to tweak */
+:root {
+    --primary: #ff6b6b;
+    /* energetic pink */
+    --secondary: #f7d794;
+    /* warm gold */
+    --accent: #4ade80;
+    /* fresh green */
+    --bg-dark: #0f0c29;
+    /* deep background */
+    --bg-mid: #302b63;
+    --bg-light: #24243e;
+    --text-light: #f0f0f0;
+    --card-bg: rgba(255, 255, 255, 0.12);
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, var(--bg-dark), var(--bg-mid), var(--bg-light));
+    color: var(--text-light);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Glass‑morphism main container */
+.stContainer {
+    background: var(--card-bg);
+    backdrop-filter: blur(14px);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1rem auto;
+    max-width: 1200px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+/* Header – big gradient text with subtle pulse */
+.header {
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 2.8rem;
+    font-weight: 800;
+    background: linear-gradient(45deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.85;
+    }
+}
+
+/* Footer – subtle glow */
+.footer {
+    text-align: center;
+    margin-top: 3rem;
+    font-size: 1rem;
+    opacity: 0.9;
+    color: var(--text-light);
+    animation: glow 4s ease-in-out infinite;
+}
+
+@keyframes glow {
+
+    0%,
+    100% {
+        text-shadow: 0 0 8px var(--accent);
+    }
+
+    50% {
+        text-shadow: 0 0 12px var(--accent);
+    }
+}
+
+/* Buttons – gradient background, smooth hover */
+.stButton button {
+    background: linear-gradient(45deg, var(--primary), var(--secondary));
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stButton button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+/* Metric cards – gradient border & subtle hover */
+[data-testid="stMetricContainer"] {
+    background: var(--card-bg);
+    border-left: 4px solid var(--primary);
+    border-radius: 8px;
+    padding: 0.8rem;
+    transition: border-color 0.3s;
+}
+
+[data-testid="stMetricContainer"]:hover {
+    border-left-color: var(--secondary);
+}
+
+/* Dataframe – rounded, slight shadow */
+[data-testid="stDataFrame"] {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar – translucent dark panel */
+[data-testid="stSidebar"] {
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+}
+
+/* Tablet breakpoint */
+@media (max-width: 768px) {
+    .header {
+        font-size: 2.2rem;
+    }
+
+    .stContainer {
+        padding: 1.5rem;
+        margin: 0.8rem;
+    }
+
+    .footer {
+        font-size: 0.9rem;
+    }
+}
+
+/* Mobile‑first – phones */
+@media (max-width: 600px) {
+    .stContainer {
+        padding: 0.8rem;
+        margin: 0.5rem;
+        max-width: 100%;
+    }
+
+    .header {
+        font-size: 1.8rem;
+    }
+
+    .stButton button {
+        width: 100%;
+        font-size: 0.9rem;
+        padding: 0.5rem;
+    }
+
+    [data-testid="stMetricContainer"] {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    [data-testid="stSidebar"] {
+        position: static;
+        width: 100%;
+        border-right: none;
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    body {
+        font-size: 0.9rem;
+    }
+}
