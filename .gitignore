@@ -21,8 +21,8 @@ wheels/
 .installed.cfg
 *.egg
 
-# Streamlit
-.streamlit/
+# Streamlit secrets (exclude, but allow config.toml)
+.streamlit/secrets.toml
 
 # Environments
 .env

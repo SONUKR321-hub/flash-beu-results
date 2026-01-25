@@ -179,7 +179,7 @@ if st.session_state.results_df is not None:
     m4.metric("Avg CGPA", f"{stats['avg_cgpa']:.2f}")
     
     # Tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Analytics", "🏆 Leaderboard", "📝 Detailed Data", "📤 Export"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Analytics", "🏆 Leaderboard", "🔍 Search Student", "📝 Detailed Data", "📤 Export"])
     
     with tab1:
         c1, c2 = st.columns([2, 1])
@@ -235,13 +235,94 @@ if st.session_state.results_df is not None:
         # Logic for subject wise toppers can go here
         
     with tab3:
+        st.markdown("### 🔍 Student Search")
+        search_query = st.selectbox(
+            "Search Student by Name or Reg No", 
+            options=df["Registration No"].tolist(),
+            format_func=lambda x: f"{x} - {df[df['Registration No'] == x]['Student Name'].values[0]}"
+        )
+        
+        if search_query:
+            student = df[df["Registration No"] == search_query].iloc[0]
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 30px; border-radius: 15px; color: white; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                <h2 style="margin: 0; color: white;">{student['Student Name']}</h2>
+                <p style="margin: 0; opacity: 0.9;">Registration: {student['Registration No']} | Father: {student.get('Father Name', 'N/A')}</p>
+                <div style="display: flex; gap: 40px; margin-top: 20px;">
+                    <div>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">SGPA</p>
+                        <h3 style="margin: 0; color: white;">{student['SGPA']}</h3>
+                    </div>
+                    <div>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">CGPA</p>
+                        <h3 style="margin: 0; color: white;">{student['CGPA']}</h3>
+                    </div>
+                    <div>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">STATUS</p>
+                        <h3 style="margin: 0; color: white;">{student['Status']}</h3>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Subject Wise Results (Detailed Marksheet)
+            st.markdown("#### 📊 Detailed Marksheet")
+            subject_grades = [c for c in df.columns if c.startswith("Sub_") and c.endswith("_Grade")]
+            
+            if subject_grades:
+                subj_data = []
+                for col in subject_grades:
+                    s_base = col.replace("_Grade", "")
+                    s_name = s_base.replace("Sub_", "")
+                    
+                    # Extract marks
+                    s_grade = student.get(col)
+                    s_ia = student.get(f"{s_base}_IA")
+                    s_ese = student.get(f"{s_base}_ESE")
+                    s_total = student.get(f"{s_base}_Total")
+                    s_credit = student.get(f"{s_base}_Credit")
+                    
+                    # Only add if grade is not empty
+                    if pd.notna(s_grade) and s_grade != "":
+                        subj_data.append({
+                            "Subject": s_name,
+                            "External (ESE)": s_ese if pd.notna(s_ese) else "-",
+                            "Internal (IA)": s_ia if pd.notna(s_ia) else "-",
+                            "Total": s_total if pd.notna(s_total) else "-",
+                            "Grade": s_grade,
+                            "Credits": s_credit if pd.notna(s_credit) else "-"
+                        })
+                
+                if subj_data:
+                    subj_df = pd.DataFrame(subj_data)
+                    # Styling the table for a marksheet look
+                    st.dataframe(
+                        subj_df, 
+                        use_container_width=True, 
+                        hide_index=True,
+                        column_config={
+                            "Subject": st.column_config.TextColumn("Subject", width="large"),
+                            "External (ESE)": st.column_config.TextColumn("Ext"),
+                            "Internal (IA)": st.column_config.TextColumn("Int"),
+                            "Total": st.column_config.TextColumn("Total"),
+                            "Grade": st.column_config.TextColumn("Gr"),
+                            "Credits": st.column_config.TextColumn("Cr")
+                        }
+                    )
+                else:
+                    st.info("No specific subject grades found for this student.")
+            else:
+                st.warning("Subject details not available for this session.")
+
+    with tab4:
         # Filters
         st.markdown("#### Filter Data")
         f1, f2 = st.columns(2)
         with f1:
-            status_filter = st.multiselect("Filter by Status", options=df["Status"].unique(), default=df["Status"].unique())
+            status_filter = st.multiselect("Filter by Status", options=df["Status"].unique(), default=df["Status"].unique(), key="status_filter_detailed")
         with f2:
-            sort_by = st.selectbox("Sort By", ["Registration No", "SGPA", "CGPA", "Student Name"])
+            sort_by = st.selectbox("Sort By", ["Registration No", "SGPA", "CGPA", "Student Name"], key="sort_by_detailed")
             
         filtered_df = df[df["Status"].isin(status_filter)]
         if sort_by == "SGPA":
@@ -253,7 +334,7 @@ if st.session_state.results_df is not None:
             
         st.dataframe(filtered_df, use_container_width=True, height=600)
         
-    with tab4:
+    with tab5:
         st.markdown("### Download Report")
         
         # CSV Export
@@ -315,21 +396,53 @@ with st.container():
         <style>
         .stPopover {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 30px;
+            right: 30px;
             z-index: 1000;
+            width: 65px !important;
+            height: 65px !important;
+        }
+        .stPopover > div {
+            width: 65px !important;
+        }
+        .stPopover > button {
+            background-color: #1a1a4b !important;
+            color: white !important;
+            border-radius: 50% !important;
+            width: 65px !important;
+            height: 65px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.3s ease-in-out !important;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4) !important;
+            border: 2px solid rgba(255,255,255,0.1) !important;
+            padding: 0 !important;
+        }
+        .stPopover > button:hover {
+            transform: scale(1.1) !important;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5) !important;
+            background-color: #242461 !important;
+        }
+        .stPopover > button div p {
+            font-size: 28px !important;
+            margin: 0 !important;
+        }
+        /* Hide the default arrow and extra spacing */
+        .stPopover > button > div:last-child {
+            display: none !important;
         }
         </style>
     """, unsafe_allow_html=True)
     
-    chat_popover = st.popover("💬 Ask Risso AI", use_container_width=False)
+    chat_popover = st.popover("✨", use_container_width=False)
     
     with chat_popover:
         st.markdown("### 🤖 Risso Chatbot")
         st.caption("Your AI assistant for BEU results")
         
-        # Hardcoded API key
-        gemini_api_key = "AIzaSyCeU5Nb77TfHqWD-pzuTamq3YYGAHaocj0"
+        # Get API key from Streamlit secrets or environment variable
+        gemini_api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
         
         # Display chat history in the popover
         for msg in st.session_state.risso_messages:

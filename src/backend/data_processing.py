@@ -71,6 +71,9 @@ def process_results_to_dataframe(results: List[Dict[str, Any]]) -> pd.DataFrame:
                 s_grade = subj.get("grade", "")
                 flat[f"Sub_{s_name}_Grade"] = s_grade
                 flat[f"Sub_{s_name}_Credit"] = subj.get("credit")
+                flat[f"Sub_{s_name}_ESE"] = subj.get("ese")
+                flat[f"Sub_{s_name}_IA"] = subj.get("ia")
+                flat[f"Sub_{s_name}_Total"] = subj.get("total")
                 
                 if s_grade == "F" or s_grade == "Ab":
                     flat["Theory Failure Count"] += 1
@@ -80,6 +83,9 @@ def process_results_to_dataframe(results: List[Dict[str, Any]]) -> pd.DataFrame:
                 s_name = subj.get("name", f"Prac {i+1}")
                 s_grade = subj.get("grade", "")
                 flat[f"Sub_{s_name}_Grade"] = s_grade
+                flat[f"Sub_{s_name}_IA"] = subj.get("ia") # Lab usually has IA
+                flat[f"Sub_{s_name}_ESE"] = subj.get("ese") # Lab usually has ESE
+                flat[f"Sub_{s_name}_Total"] = subj.get("total")
 
         data.append(flat)
 
