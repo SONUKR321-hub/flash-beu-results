@@ -1,32 +1,46 @@
 
 BRANCH_CODES = {
-    "105": "Computer Science Engineering (CSE)",
     "101": "Civil Engineering (CE)",
     "102": "Mechanical Engineering (ME)",
     "103": "Electrical Engineering (EE)",
     "104": "Electronics & Communication Engineering (ECE)",
+    "105": "Computer Science Engineering (CSE)",
     "106": "Information Technology (IT)",
     "110": "Electrical and Electronics Engineering (EEE)",
     "154": "CSE (IoT, Cyber Security, Blockchain)",
     "155": "CSE (IoT)",
     "156": "CSE (Cyber Security)",
-    "157": "CSE (Data Science)", # Add more modern branches if known
+    "157": "CSE (Data Science)",
+}
+
+BRANCH_SHORT_NAMES = {
+    "Civil Engineering (CE)": "CE",
+    "Mechanical Engineering (ME)": "ME",
+    "Electrical Engineering (EE)": "EE",
+    "Electronics & Communication Engineering (ECE)": "ECE",
+    "Computer Science Engineering (CSE)": "CSE",
+    "Information Technology (IT)": "IT",
+    "Electrical and Electronics Engineering (EEE)": "EEE",
+    "CSE (IoT, Cyber Security, Blockchain)": "CSE-IoT",
+    "CSE (IoT)": "CSE-IoT",
+    "CSE (Cyber Security)": "CSE-CS",
+    "CSE (Data Science)": "CSE-DS",
 }
 
 COLLEGE_CODES = {
-    "110": "Gaya College of Engineering, Gaya",
-    "108": "Bhagalpur College of Engineering, Bhagalpur",
     "107": "Muzaffarpur Institute of Technology, Muzaffarpur",
+    "108": "Bhagalpur College of Engineering, Bhagalpur",
     "109": "Nalanda College of Engineering, Nalanda",
+    "110": "Gaya College of Engineering, Gaya",
     "111": "Darbhanga College of Engineering, Darbhanga",
-    "113": "Motihari College Of Engineering, Mothihari",
+    "113": "Motihari College Of Engineering, Motihari",
     "117": "Lok Nayak Jai Prakash Institute of Technology, Chhapra",
     "124": "Sershah Engineering College, Sasaram, Rohtas",
     "125": "Rashtrakavi Ramdhari Singh Dinkar College of Engineering, Begusarai",
     "126": "Bakhtiyarpur College of Engineering, Patna",
     "127": "Sitamarhi Institute of Technology, Sitamarhi",
     "128": "B.P. Mandal College of Engineering, Madhepura",
-    "129": "Katihar Engineering of College, Katihar",
+    "129": "Katihar Engineering College, Katihar",
     "130": "Supaul College of Engineering, Supaul",
     "131": "Purnea College of Engineering, Purnea",
     "132": "Saharsa College of Engineering, Saharsa",
@@ -63,7 +77,61 @@ COLLEGE_CODES = {
     "123": "Siwan Engineering & Technical Institute, Siwan",
     "136": "Mother's Institute of Technology, Bihta, Patna",
     "139": "R.P. Sharma Institute of Technology, Patna",
-    "140": "Maulana Azad College of Engineering & Technology, Patna"
+    "140": "Maulana Azad College of Engineering & Technology, Patna",
+}
+
+# City/District names for display in rankings
+COLLEGE_LOCATIONS = {
+    "107": "Muzaffarpur",
+    "108": "Bhagalpur",
+    "109": "Nalanda",
+    "110": "Gaya",
+    "111": "Darbhanga",
+    "113": "Motihari",
+    "117": "Chhapra",
+    "124": "Sasaram",
+    "125": "Begusarai",
+    "126": "Patna",
+    "127": "Sitamarhi",
+    "128": "Madhepura",
+    "129": "Katihar",
+    "130": "Supaul",
+    "131": "Purnea",
+    "132": "Saharsa",
+    "133": "Jamui",
+    "134": "Banka",
+    "135": "Vaishali",
+    "141": "Nawada",
+    "142": "Kishanganj",
+    "144": "Munger",
+    "145": "Sheohar",
+    "146": "West Champaran",
+    "147": "Aurangabad",
+    "148": "Kaimur",
+    "149": "Gopalganj",
+    "150": "Madhubani",
+    "151": "Siwan",
+    "152": "Jehanabad",
+    "153": "Arwal",
+    "154": "Khagaria",
+    "155": "Buxar",
+    "156": "Bhojpur",
+    "157": "Sheikhpura",
+    "158": "Lakhisarai",
+    "159": "Samastipur",
+    "165": "Araria",
+    "102": "Purnia",
+    "103": "Patna",
+    "106": "Aurangabad",
+    "115": "Kishanganj",
+    "118": "Gaya",
+    "119": "Banka",
+    "121": "Forbesganj",
+    "122": "Vaishali",
+    "123": "Siwan",
+    "136": "Patna",
+    "139": "Patna",
+    "140": "Patna",
 }
 
 SEMESTERS = {
@@ -74,10 +142,10 @@ SEMESTERS = {
     "V": "5th Semester",
     "VI": "6th Semester",
     "VII": "7th Semester",
-    "VIII": "8th Semester"
+    "VIII": "8th Semester",
 }
 
 SEMESTER_MAPPING = {
     1: "I", 2: "II", 3: "III", 4: "IV",
-    5: "V", 6: "VI", 7: "VII", 8: "VIII"
+    5: "V", 6: "VI", 7: "VII", 8: "VIII",
 }
