@@ -282,7 +282,7 @@ if st.session_state.results_df is not None:
     # ── Tab 3: Rankings ───────────────────────────────────────────────────────
     with tab_rankings:
         st.markdown("### 🎖️ Student Rankings")
-        st.caption("Rankings are computed by CGPA (descending). Ties share the same rank.")
+        st.caption("Rankings are computed by SGPA (descending). Ties share the same rank.")
 
         r1, r2, r3 = st.columns(3)
         rank_cols = ["University Rank", "College Rank", "Class Rank"]

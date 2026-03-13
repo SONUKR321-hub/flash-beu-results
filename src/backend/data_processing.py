@@ -91,12 +91,13 @@ def process_results_to_dataframe(results: List[Dict[str, Any]]) -> pd.DataFrame:
 def calculate_ranks(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates University, College, and Class (Branch+College) ranks for students.
-    All ranks based on CGPA descending (ties share same rank).
+    All ranks based on SGPA descending (ties share same rank).
     """
     if df.empty:
         return df
 
-    rank_col = "CGPA" if "CGPA" in df.columns else "SGPA"
+    # We use SGPA for ranking as requested, fallback to CGPA if SGPA is missing
+    rank_col = "SGPA" if "SGPA" in df.columns else "CGPA"
 
     # University Rank — global, across all fetched students
     df["University Rank"] = df[rank_col].rank(ascending=False, method="min").fillna(0).astype(int)
@@ -138,7 +139,7 @@ def calculate_ranks(df: pd.DataFrame) -> pd.DataFrame:
 def calculate_college_rankings(df: pd.DataFrame) -> pd.DataFrame:
     """
     Groups students by college and computes performance metrics.
-    Returns a college-level summary DataFrame ranked by Avg CGPA.
+    Returns a college-level summary DataFrame ranked by Avg SGPA.
     """
     if df.empty or "College Code" not in df.columns:
         return pd.DataFrame()
@@ -153,9 +154,9 @@ def calculate_college_rankings(df: pd.DataFrame) -> pd.DataFrame:
     agg = df.groupby("College Code").agg(
         College_Name=("College Name", "first"),
         Total_Students=("Registration No", "count"),
-        Avg_CGPA=("CGPA", "mean"),
         Avg_SGPA=("SGPA", "mean"),
-        Max_CGPA=("CGPA", "max"),
+        Avg_CGPA=("CGPA", "mean"),
+        Max_SGPA=("SGPA", "max"),
     ).reset_index()
 
     # Pass percentage per college
@@ -163,20 +164,21 @@ def calculate_college_rankings(df: pd.DataFrame) -> pd.DataFrame:
     pass_data.columns = ["College Code", "Pass_Percentage"]
     agg = agg.merge(pass_data, on="College Code", how="left")
 
-    agg = agg.sort_values("Avg_CGPA", ascending=False).reset_index(drop=True)
+    # Rank by Avg SGPA primarily
+    agg = agg.sort_values("Avg_SGPA", ascending=False).reset_index(drop=True)
     agg["College Rank"] = range(1, len(agg) + 1)
 
     # Round numeric columns
-    agg["Avg_CGPA"] = agg["Avg_CGPA"].round(2)
     agg["Avg_SGPA"] = agg["Avg_SGPA"].round(2)
-    agg["Max_CGPA"] = agg["Max_CGPA"].round(2)
+    agg["Avg_CGPA"] = agg["Avg_CGPA"].round(2)
+    agg["Max_SGPA"] = agg["Max_SGPA"].round(2)
 
     return agg.rename(columns={
         "College_Name": "College Name",
         "Total_Students": "Total Students",
-        "Avg_CGPA": "Avg CGPA",
         "Avg_SGPA": "Avg SGPA",
-        "Max_CGPA": "Best CGPA",
+        "Avg_CGPA": "Avg CGPA",
+        "Max_SGPA": "Best SGPA",
         "Pass_Percentage": "Pass %",
     })
 
@@ -184,7 +186,7 @@ def calculate_college_rankings(df: pd.DataFrame) -> pd.DataFrame:
 def calculate_branch_rankings(df: pd.DataFrame) -> pd.DataFrame:
     """
     Groups students by Branch and computes cross-college branch performance.
-    Returns a branch-level summary DataFrame ranked by Avg CGPA.
+    Returns a branch-level summary DataFrame ranked by Avg SGPA.
     """
     if df.empty or "Branch" not in df.columns:
         return pd.DataFrame()
@@ -198,9 +200,9 @@ def calculate_branch_rankings(df: pd.DataFrame) -> pd.DataFrame:
 
     agg = df.groupby("Branch").agg(
         Total_Students=("Registration No", "count"),
-        Avg_CGPA=("CGPA", "mean"),
         Avg_SGPA=("SGPA", "mean"),
-        Max_CGPA=("CGPA", "max"),
+        Avg_CGPA=("CGPA", "mean"),
+        Max_SGPA=("SGPA", "max"),
         Colleges=("College Code", "nunique"),
     ).reset_index()
 
@@ -208,25 +210,25 @@ def calculate_branch_rankings(df: pd.DataFrame) -> pd.DataFrame:
     pass_data.columns = ["Branch", "Pass_Percentage"]
     agg = agg.merge(pass_data, on="Branch", how="left")
 
-    agg = agg.sort_values("Avg_CGPA", ascending=False).reset_index(drop=True)
+    agg = agg.sort_values("Avg_SGPA", ascending=False).reset_index(drop=True)
     agg["Branch Rank"] = range(1, len(agg) + 1)
 
-    agg["Avg_CGPA"] = agg["Avg_CGPA"].round(2)
     agg["Avg_SGPA"] = agg["Avg_SGPA"].round(2)
-    agg["Max_CGPA"] = agg["Max_CGPA"].round(2)
+    agg["Avg_CGPA"] = agg["Avg_CGPA"].round(2)
+    agg["Max_SGPA"] = agg["Max_SGPA"].round(2)
 
     return agg.rename(columns={
         "Total_Students": "Total Students",
-        "Avg_CGPA": "Avg CGPA",
         "Avg_SGPA": "Avg SGPA",
-        "Max_CGPA": "Best CGPA",
+        "Avg_CGPA": "Avg CGPA",
+        "Max_SGPA": "Best SGPA",
         "Pass_Percentage": "Pass %",
         "Colleges": "Colleges Represented",
     })
 
 
 def get_top_students(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
-    """Returns top N students university-wide, sorted by CGPA then SGPA."""
+    """Returns top N students university-wide, sorted by SGPA then CGPA."""
     if df.empty:
         return pd.DataFrame()
     cols = ["University Rank", "Student Name", "Registration No", "College Name", "Branch", "CGPA", "SGPA", "Status"]
