@@ -1,4 +1,4 @@
-
+https://beu-result-analyser.streamlit.app/
 # 🎓 BEU Insights Master
 
 A premium, high-performance result analyzer for Bihar Engineering University (BEU). 
