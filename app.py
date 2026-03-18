@@ -58,13 +58,13 @@ with st.sidebar:
     st.title("🎓 Config Panel")
 
     st.markdown("### Batch Details")
-    batch_year = st.number_input("Batch Year (e.g. 24 for 2024)", min_value=15, max_value=30, value=24)
+    batch_year = st.number_input("Batch Year (e.g. 23 for 2023)", min_value=15, max_value=30, value=23)
 
     semester_num = st.selectbox(
         "Semester",
         options=list(SEMESTER_MAPPING.keys()),
         format_func=lambda x: f"{x} ({SEMESTERS[SEMESTER_MAPPING[x]]})",
-        index=1,  # Default to 2nd semester
+        index=2,  # Default to 3rd semester
     )
     semester_roman = SEMESTER_MAPPING[semester_num]
 
@@ -108,8 +108,8 @@ with st.sidebar:
 
         def fetch_with_auto_probe(start, end, branch, college, batch, sem, lateral):
             dates = [
-                "November/2025", "July/2025", "May/2025",
-                "Dec/2024", "Sep/2024", "Aug/2024",
+                "January/2026", "November/2025", "July/2025", "May/2025",
+                "ASPX_2023_SEM1", "Dec/2024", "Sep/2024", "Aug/2024",
                 "July/2024", "May/2024", "Dec/2023",
             ]
             my_bar = st.progress(0, text="Searching for correct exam session...")
