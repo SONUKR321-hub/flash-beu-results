@@ -109,9 +109,14 @@ with st.sidebar:
         def fetch_with_auto_probe(start, end, branch, college, batch, sem, lateral):
             dates = [
                 "January/2026", "November/2025", "July/2025", "May/2025",
-                "ASPX_2023_SEM1", "Dec/2024", "Sep/2024", "Aug/2024",
+                "Dec/2024", "Sep/2024", "Aug/2024",
                 "July/2024", "May/2024", "Dec/2023",
             ]
+            # Legacy ASPX portal probes for 2023 batch
+            if sem == "I" and batch == 23:
+                dates = ["ASPX_2023_SEM1"] + dates
+            if sem == "II" and batch == 23:
+                dates = ["ASPX_2023_SEM2"] + dates
             my_bar = st.progress(0, text="Searching for correct exam session...")
             for idx, date in enumerate(dates):
                 st.toast(f"Trying session: {date}...", icon="🔍")
@@ -141,7 +146,7 @@ with st.sidebar:
                 st.success(f"✅ Fetched {len(df)} records!")
             else:
                 st.error("No results found in any recent exam session.")
-                st.info("Tried: November/2025, July/2025, May/2025, Dec/2024, Sep/2024, Aug/2024, July/2024, May/2024, Dec/2023.")
+                st.info(f"Tried: ASPX 2023 portal, November/2025, July/2025, May/2025, Dec/2024, Sep/2024, Aug/2024, July/2024, May/2024, Dec/2023.")
                 st.warning("**Tips:** Check batch year, semester, and branch code.")
                 if batch_year == 24:
                     check_23 = client.fetch_batch_results(

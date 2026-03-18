@@ -33,6 +33,8 @@ class BEUApiClient:
         """
         if exam_held == "ASPX_2023_SEM1":
             return self._fetch_aspx_2023_sem1(registration_no)
+        if exam_held == "ASPX_2023_SEM2":
+            return self._fetch_aspx_2023_sem2(registration_no)
 
         params = {
             "year": batch_year,
@@ -109,15 +111,30 @@ class BEUApiClient:
         return results
 
     def _fetch_aspx_2023_sem1(self, registration_no: str) -> Optional[Dict[str, Any]]:
-        url = "https://results.beup.ac.in/BTech1stSem2023_B2023Results.aspx"
+        return self._fetch_aspx_legacy(
+            registration_no,
+            url="https://results.beup.ac.in/BTech1stSem2023_B2023Results.aspx",
+            semester="I",
+            exam_held="July/2024",
+        )
+
+
+    def _fetch_aspx_2023_sem2(self, registration_no: str) -> Optional[Dict[str, Any]]:
+        return self._fetch_aspx_legacy(
+            registration_no,
+            url="https://results.beup.ac.in/BTech2ndSem2024_B2023Results.aspx",
+            semester="II",
+            exam_held="Jan/2025",
+        )
+
+    def _fetch_aspx_legacy(self, registration_no: str, url: str, semester: str, exam_held: str) -> Optional[Dict[str, Any]]:
+        """Generic ASPX scraper for BEU legacy result portals."""
         try:
             res = self.session.get(url, timeout=10)
             viewstate_match = re.search(r'id="__VIEWSTATE"\s+value="([^"]+)"', res.text)
             eventval_match = re.search(r'id="__EVENTVALIDATION"\s+value="([^"]+)"', res.text)
-            
             if not viewstate_match or not eventval_match:
                 return None
-                
             data = {
                 "__VIEWSTATE": viewstate_match.group(1),
                 "__EVENTVALIDATION": eventval_match.group(1),
@@ -126,33 +143,21 @@ class BEUApiClient:
             }
             res_post = self.session.post(url, data=data, timeout=10)
             html = res_post.text
-            
-            # Check if no result found
             if "You may have entered a Wrong Registration Number" in html and "StudentNameLabel" not in html:
                 return None
-                
             def _get(pattern):
                 m = re.search(pattern, html)
                 return m.group(1).strip() if m else None
-
             name = _get(r'id="ContentPlaceHolder1_DataList1_StudentNameLabel_0"[^>]*>([^<]+)</span>')
             if not name:
-                return None  # Student truly not found
-
+                return None
             sgpa_str = _get(r'id="ContentPlaceHolder1_DataList5_GROSSTHEORYTOTALLabel_0"[^>]*>([^<]+)</span>')
-            sgpa_val = float(sgpa_str) if sgpa_str else None
-
             father = _get(r'id="ContentPlaceHolder1_DataList1_FatherNameLabel_0"[^>]*>([^<]+)</span>')
             college_code = _get(r'id="ContentPlaceHolder1_DataList1_CollegeCodeLabel_0"[^>]*>([^<]+)</span>')
             college_name = _get(r'id="ContentPlaceHolder1_DataList1_CollegeNameLabel_0"[^>]*>([^<]+)</span>')
-            course_code = _get(r'id="ContentPlaceHolder1_DataList1_CourseCodeLabel_0"[^>]*>([^<]+)</span>')
             course_name = _get(r'id="ContentPlaceHolder1_DataList1_CourseLabel_0"[^>]*>([^<]+)</span>')
             remark = _get(r'id="ContentPlaceHolder1_DataList3_remarkLabel_0"[^>]*>([^<]*)</span>')
-
-            # Determine pass/fail: empty remark = PASS, non-empty (back/fail) = FAIL
             status = "PASS" if not remark else "FAIL"
-
-            # Parse theory subjects from GridView1
             theory_rows = re.findall(
                 r'<td align="center">(\d+)</td><td align="left">([^<]+)</td>'
                 r'<td align="center">([^<]+)</td><td align="center">([^<]+)</td>'
@@ -168,15 +173,10 @@ class BEUApiClient:
                 except ValueError:
                     credit_f = None
                 theory_subjects.append({
-                    "code": code,
-                    "name": subj_name.strip(),
-                    "ese": ese.strip(),
-                    "ia": ia.strip(),
-                    "total": total.strip(),
-                    "grade": grade.strip(),
-                    "credit": credit_f,
+                    "code": code, "name": subj_name.strip(),
+                    "ese": ese.strip(), "ia": ia.strip(),
+                    "total": total.strip(), "grade": grade.strip(), "credit": credit_f,
                 })
-
             return {
                 "redg_no": registration_no,
                 "name": name,
@@ -184,16 +184,14 @@ class BEUApiClient:
                 "college_code": college_code,
                 "college_name": college_name.title() if college_name else None,
                 "course": course_name.title() if course_name else None,
-                "semester": "I",
-                "exam_held": "July/2024",  # Actual exam held month from ASPX page
-                # sgpa must be a list (matching the JSON API structure)
+                "semester": semester,
+                "exam_held": exam_held,
                 "sgpa": [sgpa_str] if sgpa_str else [],
-                "cgpa": sgpa_str,  # For 1st sem, cgpa == sgpa
+                "cgpa": sgpa_str,
                 "fail_any": status,
                 "theorySubjects": theory_subjects,
                 "practicalSubjects": [],
             }
         except requests.RequestException as e:
-            logger.warning(f"ASPX request failed for {registration_no}: {e}")
+            logger.warning(f"ASPX legacy request failed for {registration_no}: {e}")
         return None
-
