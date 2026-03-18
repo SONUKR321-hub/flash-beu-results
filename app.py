@@ -501,13 +501,56 @@ if st.session_state.results_df is not None:
                     reg_no     = student.get('Registration No', 'N/A')
                     name_val   = student.get('Student Name', 'N/A')
 
-                    # CGPA history row — fill current sem, rest NA
+                    # CGPA History — fetch real SGPAs for previous semesters
                     sem_order = ["I","II","III","IV","V","VI","VII","VIII"]
+                    # Sentinel → (semester_roman, batch, exam_held) for each sem
+                    SEM_PROBES = {
+                        "I":   ("I",   23, "ASPX_2023_SEM1"),
+                        "II":  ("II",  23, "ASPX_2023_SEM2"),
+                        "III": ("III", 23, "July/2025"),
+                    }
+
+                    @st.cache_data(show_spinner=False)
+                    def _fetch_sem_sgpa(reg_no: str, sem: str):
+                        if sem not in SEM_PROBES:
+                            return None
+                        s_roman, batch, exam = SEM_PROBES[sem]
+                        try:
+                            r = client.fetch_result(reg_no, s_roman, batch, exam)
+                            if r:
+                                sgpa_raw = r.get("sgpa")
+                                if isinstance(sgpa_raw, list) and sgpa_raw:
+                                    for v in reversed(sgpa_raw):
+                                        try: return float(v)
+                                        except: pass
+                                elif sgpa_raw:
+                                    try: return float(sgpa_raw)
+                                    except: pass
+                        except:
+                            pass
+                        return None
+
+                    current_sem_idx = sem_order.index(sem_val) if sem_val in sem_order else -1
+                    sem_sgpas = {}   # sem -> float or None
+                    for s in sem_order[:current_sem_idx]:      # previous sems
+                        sem_sgpas[s] = _fetch_sem_sgpa(reg_no, s)
+                    sem_sgpas[sem_val] = student.get('SGPA')   # current sem from df
+
+                    # Build CGPA history cells
+                    filled = [v for v in sem_sgpas.values() if v is not None and not (isinstance(v, float) and pd.isna(v))]
+                    running_cgpa = round(sum(filled) / len(filled), 2) if filled else None
                     cgpa_cells = ""
                     for s in sem_order:
-                        val = sgpa_val if s == sem_val else "NA"
-                        cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-size:13px;">{val}</td>'
-                    cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-weight:700;font-size:13px;">{cgpa_val}</td>'
+                        v = sem_sgpas.get(s)
+                        if v is None or (isinstance(v, float) and pd.isna(v)):
+                            cgpa_cells += '<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-size:13px;color:#999;">NA</td>'
+                        else:
+                            cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-size:13px;font-weight:600;">{v:.2f}</td>'
+                    rc = f"{running_cgpa:.2f}" if running_cgpa else "N/A"
+                    cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-weight:700;font-size:13px;">{rc}</td>'
+                    # Update cgpa_val display too
+                    cgpa_val = rc
+
 
                     remark_text = "" if status_val == "PASS" else "BACK"
                     remark_color = "#166534" if status_val == "PASS" else "#991b1b"
