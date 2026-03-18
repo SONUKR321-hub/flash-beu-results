@@ -445,7 +445,7 @@ if st.session_state.results_df is not None:
                 <div style="display:flex;flex-wrap:wrap;gap:12px;">{cards_html}</div>
             </div>""", unsafe_allow_html=True)
 
-            # ── Official-style BEU Marksheet ─────────────────────────────────
+            # ── Official BEU Marksheet (PDF-style) ───────────────────────────
             st.markdown("#### 📄 Official Marksheet")
             subject_grades = [c for c in df.columns if c.startswith("Sub_") and c.endswith("_Grade")]
             if subject_grades:
@@ -464,133 +464,182 @@ if st.session_state.results_df is not None:
                             "ese": s_ese if pd.notna(s_ese) else "-",
                             "ia": s_ia if pd.notna(s_ia) else "-",
                             "total": s_total if pd.notna(s_total) else "-",
-                            "grade": s_grade,
+                            "grade": str(s_grade).strip(),
                             "credit": s_credit if pd.notna(s_credit) else "-",
                         })
 
                 if subj_data:
-                    # Build subject rows HTML
-                    def grade_color(g):
-                        g = str(g).strip().upper()
-                        if g in ("O", "A+", "A"): return "#16a34a"
-                        if g in ("B+", "B"): return "#2563eb"
-                        if g in ("C", "D"): return "#d97706"
-                        if g in ("F", "AB"): return "#dc2626"
-                        return "#374151"
+                    def grade_bg(g):
+                        g = str(g).strip().upper().rstrip()
+                        if g in ("O", "A+", "A"): return "#dcfce7", "#166534"
+                        if g in ("B+", "B"): return "#dbeafe", "#1e40af"
+                        if g in ("C", "D"): return "#fef9c3", "#854d0e"
+                        if g in ("F", "AB"): return "#fee2e2", "#991b1b"
+                        return "#f3f4f6", "#374151"
 
                     rows_html = ""
                     for i, s in enumerate(subj_data):
-                        bg = "#f9fafb" if i % 2 == 0 else "#fff"
-                        rows_html += f"""
-                        <tr style="background:{bg};">
-                            <td style="padding:8px 12px;border:1px solid #d1d5db;">{s['name']}</td>
-                            <td style="padding:8px 12px;border:1px solid #d1d5db;text-align:center;">{s['ese']}</td>
-                            <td style="padding:8px 12px;border:1px solid #d1d5db;text-align:center;">{s['ia']}</td>
-                            <td style="padding:8px 12px;border:1px solid #d1d5db;text-align:center;font-weight:600;">{s['total']}</td>
-                            <td style="padding:8px 12px;border:1px solid #d1d5db;text-align:center;font-weight:700;color:{grade_color(s['grade'])};">{s['grade']}</td>
-                            <td style="padding:8px 12px;border:1px solid #d1d5db;text-align:center;">{s['credit']}</td>
-                        </tr>"""
+                        gbg, gfg = grade_bg(s['grade'])
+                        bg = "#fafafa" if i % 2 == 0 else "#fff"
+                        rows_html += f"""<tr style="background:{bg};">
+<td style="padding:7px 10px;border:1px solid #999;font-size:13px;">{s['name']}</td>
+<td style="padding:7px 10px;border:1px solid #999;text-align:center;font-size:13px;">{s['ese']}</td>
+<td style="padding:7px 10px;border:1px solid #999;text-align:center;font-size:13px;">{s['ia']}</td>
+<td style="padding:7px 10px;border:1px solid #999;text-align:center;font-weight:700;font-size:13px;">{s['total']}</td>
+<td style="padding:7px 10px;border:1px solid #999;text-align:center;font-weight:700;font-size:13px;background:{gbg};color:{gfg};">{s['grade']}</td>
+<td style="padding:7px 10px;border:1px solid #999;text-align:center;font-size:13px;">{s['credit']}</td>
+</tr>"""
 
                     sgpa_val = f"{student.get('SGPA'):.2f}" if pd.notna(student.get('SGPA')) else "N/A"
                     cgpa_val = f"{student.get('CGPA'):.2f}" if pd.notna(student.get('CGPA')) else "N/A"
-                    status_val = str(student.get('Status', 'N/A')).upper()
-                    status_clr = "#16a34a" if status_val == "PASS" else "#dc2626"
-                    exam_held = student.get('Exam Held', 'N/A')
-                    sem_val = student.get('Semester', 'N/A')
-                    college = student.get('College Name', 'N/A')
-                    branch = student.get('Branch', 'N/A')
-                    father = student.get('Father Name', 'N/A')
-                    reg_no = student.get('Registration No', 'N/A')
-                    name_val = student.get('Student Name', 'N/A')
+                    status_val = str(student.get('Status', '')).upper()
+                    exam_held  = student.get('Exam Held', 'N/A')
+                    sem_val    = student.get('Semester', 'N/A')
+                    college    = student.get('College Name', 'N/A')
+                    branch     = student.get('Branch', 'N/A')
+                    father     = student.get('Father Name', 'N/A')
+                    reg_no     = student.get('Registration No', 'N/A')
+                    name_val   = student.get('Student Name', 'N/A')
+
+                    # CGPA history row — fill current sem, rest NA
+                    sem_order = ["I","II","III","IV","V","VI","VII","VIII"]
+                    cgpa_cells = ""
+                    for s in sem_order:
+                        val = sgpa_val if s == sem_val else "NA"
+                        cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-size:13px;">{val}</td>'
+                    cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-weight:700;font-size:13px;">{cgpa_val}</td>'
+
+                    remark_text = "" if status_val == "PASS" else "BACK"
+                    remark_color = "#166534" if status_val == "PASS" else "#991b1b"
 
                     marksheet_html = f"""
-<div id="beu-marksheet" style="
-    font-family: 'Times New Roman', serif;
-    max-width: 860px; margin: 0 auto;
-    border: 2px solid #1e3a8a;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.13);
-    overflow: hidden;
-">
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg,#1e3a8a,#1d4ed8);
-        color:white; padding:20px 28px; text-align:center;">
-        <div style="font-size:1.5rem;font-weight:700;letter-spacing:.03em;">
-            BIHAR ENGINEERING UNIVERSITY, PATNA
-        </div>
-        <div style="font-size:1rem;opacity:0.85;margin-top:4px;">
-            B.Tech. {sem_val} Semester Examination, {exam_held}
-        </div>
-        <div style="font-size:0.85rem;opacity:0.7;margin-top:2px;">WEB COPY — Not valid for official purpose</div>
-    </div>
-
-    <!-- Student Info -->
-    <div style="padding:16px 28px;background:#f0f4ff;border-bottom:1px solid #bfdbfe;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.92rem;">
-            <tr>
-                <td style="padding:4px 8px;width:50%;"><strong>Name:</strong> {name_val}</td>
-                <td style="padding:4px 8px;"><strong>Registration No:</strong> {reg_no}</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px;"><strong>Father's Name:</strong> {father}</td>
-                <td style="padding:4px 8px;"><strong>Branch:</strong> {branch}</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px;" colspan="2"><strong>College:</strong> {college}</td>
-            </tr>
-        </table>
-    </div>
-
-    <!-- Subject Table -->
-    <div style="padding:16px 28px;">
-        <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:#1e3a8a;text-transform:uppercase;letter-spacing:.05em;">
-            Theory Subjects
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-            <thead>
-                <tr style="background:#1e3a8a;color:white;">
-                    <th style="padding:9px 12px;border:1px solid #1e40af;text-align:left;">Subject Name</th>
-                    <th style="padding:9px 12px;border:1px solid #1e40af;">ESE</th>
-                    <th style="padding:9px 12px;border:1px solid #1e40af;">IA</th>
-                    <th style="padding:9px 12px;border:1px solid #1e40af;">Total</th>
-                    <th style="padding:9px 12px;border:1px solid #1e40af;">Grade</th>
-                    <th style="padding:9px 12px;border:1px solid #1e40af;">Credits</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows_html}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- SGPA / CGPA Summary -->
-    <div style="padding:12px 28px 16px;background:#f0f4ff;border-top:1px solid #bfdbfe;
-        display:flex;gap:32px;align-items:center;flex-wrap:wrap;">
-        <div style="font-size:1.1rem;font-weight:700;color:#1e3a8a;">
-            SGPA: <span style="font-size:1.4rem;">{sgpa_val}</span>
-        </div>
-        <div style="font-size:1.1rem;font-weight:700;color:#1e3a8a;">
-            CGPA: <span style="font-size:1.4rem;">{cgpa_val}</span>
-        </div>
-        <div style="font-size:1.1rem;font-weight:700;">
-            Result: <span style="color:{status_clr};font-size:1.3rem;">{status_val}</span>
-        </div>
-    </div>
-
-    <!-- Legend -->
-    <div style="padding:10px 28px;font-size:0.78rem;color:#6b7280;border-top:1px solid #e5e7eb;">
-        <strong>Note:</strong> ESE = End Semester Exam &nbsp;|&nbsp; IA = Internal Assessment &nbsp;|&nbsp;
-        Grade: O &gt; A+ &gt; A &gt; B+ &gt; B &gt; C &gt; D &gt; F(Fail) &nbsp;|&nbsp; AB = Absent
-    </div>
-</div>
 <style>
+#beu-ms {{ font-family:'Times New Roman',serif; max-width:900px; margin:0 auto;
+    border:2px solid #333; background:#fff; box-shadow:0 4px 24px rgba(0,0,0,.18); }}
+#beu-ms table {{ border-collapse:collapse; }}
+#beu-ms th {{ background:#333; color:#fff; padding:7px 10px; border:1px solid #999; font-size:13px; }}
 @media print {{
-    .stApp header, .stSidebar, .stToolbar {{ display: none !important; }}
-    #beu-marksheet {{ box-shadow: none; border: 1.5px solid #000; }}
+  .stApp>header,.stSidebar,div[data-testid="stToolbar"],div[data-testid="stDecoration"],
+  .stButton,footer {{ display:none!important; }}
+  #beu-ms {{ box-shadow:none; border:1.5px solid #000; max-width:100%; }}
 }}
 </style>
-"""
+<div id="beu-ms">
+
+  <!-- University Header -->
+  <div style="text-align:center;padding:14px 20px 10px;border-bottom:2px solid #333;">
+    <div style="font-size:1.05rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">
+      Bihar Engineering University, Patna
+    </div>
+  </div>
+
+  <!-- Exam Title -->
+  <div style="text-align:center;padding:8px 20px;border-bottom:1px solid #ccc;">
+    <span style="font-size:1.1rem;font-weight:700;color:#cc0000;">
+      B.Tech. {sem_val} Semester Examination, {exam_held}
+    </span>
+  </div>
+
+  <!-- Navigation link -->
+  <div style="text-align:right;padding:6px 16px;border-bottom:1px solid #ccc;">
+    <span style="font-size:12px;color:#1d4ed8;cursor:pointer;">View another Result</span>
+  </div>
+
+  <!-- Student Info Box -->
+  <div style="padding:10px 16px;border-bottom:1px solid #ccc;">
+    <table style="width:100%;font-size:13px;">
+      <tr>
+        <td style="padding:3px 6px;width:15%;"><b>Registration No:</b></td>
+        <td style="padding:3px 6px;" colspan="3"><b>{reg_no}</b></td>
+      </tr>
+      <tr>
+        <td style="padding:3px 6px;"><b>Student Name:</b></td>
+        <td style="padding:3px 6px;" colspan="3"><b>{name_val}</b></td>
+      </tr>
+      <tr>
+        <td style="padding:3px 6px;"><b>Father Name:</b></td>
+        <td style="padding:3px 6px;">{father}</td>
+        <td style="padding:3px 6px;"><b>Branch:</b></td>
+        <td style="padding:3px 6px;">{branch}</td>
+      </tr>
+      <tr>
+        <td style="padding:3px 6px;"><b>College:</b></td>
+        <td style="padding:3px 6px;" colspan="3">{college}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Theory Subjects Table -->
+  <div style="padding:10px 16px 6px;">
+    <table style="width:100%;caption-side:top;">
+      <caption style="text-align:center;font-weight:700;font-size:14px;padding:4px 0 6px;">THEORY</caption>
+      <thead>
+        <tr>
+          <th style="text-align:left;min-width:220px;">Subject Name</th>
+          <th>ESE</th><th>IA</th><th>Total</th><th>Grade</th><th>Credit</th>
+        </tr>
+      </thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+  </div>
+
+  <!-- SGPA Row -->
+  <div style="padding:6px 16px 4px;text-align:right;font-size:14px;font-weight:700;border-top:1px solid #ccc;">
+    SGPA : <span style="font-size:1.2rem;">{sgpa_val}</span>
+  </div>
+
+  <!-- CGPA History Table -->
+  <div style="padding:6px 16px 10px;border-top:1px solid #ccc;">
+    <table style="width:100%;">
+      <thead>
+        <tr>
+          <th colspan="2" style="text-align:left;padding:5px 8px;border:1px solid #999;font-size:13px;background:#444;">Semester</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">I</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">II</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">III</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">IV</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">V</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">VI</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">VII</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">VIII</th>
+          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">Cur. CGPA</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="2" style="border:1px solid #999;padding:5px 8px;font-size:13px;font-weight:700;">SGPA</td>
+          {cgpa_cells}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Remarks & Publish Date -->
+  <div style="padding:8px 16px;border-top:1px solid #ccc;font-size:13px;display:flex;justify-content:space-between;">
+    <div>
+      <b>Remarks:</b>
+      <span style="color:{remark_color};font-weight:700;">{remark_text}</span>
+    </div>
+    <div style="color:#555;font-size:12px;">WEB COPY — Not valid for official purpose</div>
+  </div>
+
+  <!-- Notes -->
+  <div style="padding:8px 16px;border-top:1px solid #ccc;font-size:11.5px;color:#555;">
+    <b>NOTE:</b>
+    ESE: End Semester Exam &nbsp;|&nbsp; IA: Internal Assessment &nbsp;|&nbsp;
+    SGPA: Semester Grade Point Average &nbsp;|&nbsp; CGPA: Cumulative Grade Point Average &nbsp;|&nbsp;
+    AB: Absent &nbsp;|&nbsp; NA: Not Applicable &nbsp;|&nbsp;
+    Grade: O &gt; A+ &gt; A &gt; B+ &gt; B &gt; C &gt; D &gt; F(Fail)
+  </div>
+
+  <!-- Print Button -->
+  <div style="text-align:center;padding:10px;border-top:1px solid #ccc;">
+    <button onclick="window.print()"
+      style="background:#1e3a8a;color:#fff;border:none;padding:8px 28px;border-radius:6px;
+      font-size:14px;cursor:pointer;font-family:sans-serif;">🖨️ Print Marksheet</button>
+  </div>
+
+</div>"""
                     st.markdown(marksheet_html, unsafe_allow_html=True)
                 else:
                     st.info("No subject grades found for this student.")
@@ -599,6 +648,7 @@ if st.session_state.results_df is not None:
 
 
     # ── Tab 7: All Data ───────────────────────────────────────────────────────
+
     with tab_data:
         st.markdown("#### Filter & Explore Data")
         f1, f2, f3 = st.columns(3)
