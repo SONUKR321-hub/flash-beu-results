@@ -58,13 +58,13 @@ with st.sidebar:
     st.title("🎓 Config Panel")
 
     st.markdown("### Batch Details")
-    batch_year = st.number_input("Batch Year (e.g. 23 for 2023)", min_value=15, max_value=30, value=23)
+    batch_year = st.number_input("Batch Year (e.g. 23 for 2023)", min_value=15, max_value=30, value=22)
 
     semester_num = st.selectbox(
         "Semester",
         options=list(SEMESTER_MAPPING.keys()),
         format_func=lambda x: f"{x} ({SEMESTERS[SEMESTER_MAPPING[x]]})",
-        index=2,  # Default to 3rd semester
+        index=5,  # Default to 6th semester
     )
     semester_roman = SEMESTER_MAPPING[semester_num]
 
@@ -94,6 +94,13 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### ⚙️ Advanced Settings")
+    
+    exam_override = st.selectbox(
+        "Manual Exam Session Override (Optional)",
+        ["Auto-Detect", "January/2026", "December/2025", "November/2025", "July/2025", "May/2025", "Dec/2024", "Sep/2024", "Aug/2024", "July/2024", "May/2024", "Dec/2023"],
+        index=0
+    )
+    
     enable_auto_refresh = st.checkbox("🔄 Auto-Refresh Results", value=False)
     if enable_auto_refresh:
         refresh_interval = st.number_input("Refresh Interval (minutes)", min_value=1, max_value=30, value=5)
@@ -108,7 +115,7 @@ with st.sidebar:
 
         def fetch_with_auto_probe(start, end, branch, college, batch, sem, lateral):
             dates = [
-                "January/2026", "November/2025", "July/2025", "May/2025",
+                "January/2026", "December/2025", "November/2025", "July/2025", "May/2025",
                 "Dec/2024", "Sep/2024", "Aug/2024",
                 "July/2024", "May/2024", "Dec/2023",
             ]
@@ -120,9 +127,9 @@ with st.sidebar:
             my_bar = st.progress(0, text="Searching for correct exam session...")
             for idx, date in enumerate(dates):
                 st.toast(f"Trying session: {date}...", icon="🔍")
-                probe_end = start + 4
+                probe_end = start + 9
                 probe_results = client.fetch_batch_results(
-                    start, probe_end, branch, college, batch, sem, date, lateral, workers=5
+                    start, probe_end, branch, college, batch, sem, date, lateral, workers=10
                 )
                 if probe_results:
                     st.toast(f"Found data in {date}!", icon="✅")
@@ -133,11 +140,18 @@ with st.sidebar:
                 my_bar.progress(int((idx + 1) / len(dates) * 100), text=f"Checking {date}...")
             return []
 
-        with st.spinner(f"Auto-detecting results for {COLLEGE_CODES.get(college_code, college_code)}..."):
-            raw_results = fetch_with_auto_probe(
-                start_reg, end_reg, branch_code, college_code,
-                batch_year, semester_roman, include_lateral,
-            )
+        with st.spinner(f"Fetching results for {COLLEGE_CODES.get(college_code, college_code)}..."):
+            if exam_override != "Auto-Detect":
+                st.toast(f"Using forced session: {exam_override}", icon="⚠️")
+                raw_results = client.fetch_batch_results(
+                    start_reg, end_reg, branch_code, college_code,
+                    batch_year, semester_roman, exam_override, include_lateral
+                )
+            else:
+                raw_results = fetch_with_auto_probe(
+                    start_reg, end_reg, branch_code, college_code,
+                    batch_year, semester_roman, include_lateral,
+                )
 
             if raw_results:
                 df = process_results_to_dataframe(raw_results)
@@ -146,7 +160,7 @@ with st.sidebar:
                 st.success(f"✅ Fetched {len(df)} records!")
             else:
                 st.error("No results found in any recent exam session.")
-                st.info(f"Tried: ASPX 2023 portal, November/2025, July/2025, May/2025, Dec/2024, Sep/2024, Aug/2024, July/2024, May/2024, Dec/2023.")
+                st.info(f"Tried: ASPX 2023 portal, January/2026, December/2025, November/2025, July/2025, May/2025, Dec/2024, Sep/2024, Aug/2024, July/2024, May/2024, Dec/2023.")
                 st.warning("**Tips:** Check batch year, semester, and branch code.")
                 if batch_year == 24:
                     check_23 = client.fetch_batch_results(
@@ -447,8 +461,22 @@ if st.session_state.results_df is not None:
 
             # ── Official BEU Marksheet (PDF-style) ───────────────────────────
             st.markdown("#### 📄 Official Marksheet")
+            
+            reg_no_str = str(student.get('Registration No', ''))
+            batch = int(reg_no_str[:2]) if len(reg_no_str) >= 2 and reg_no_str[:2].isdigit() else 23
+            r_marksheet = BEUApiClient().fetch_result(reg_no_str, student.get('Semester', 'I'), batch, str(student.get('Exam Held', '')))
+            
             subject_grades = [c for c in df.columns if c.startswith("Sub_") and c.endswith("_Grade")]
-            if subject_grades:
+            
+            if r_marksheet and r_marksheet.get('raw_html'):
+                target_url = "https://results.beup.ac.in/"
+                beu_html = r_marksheet['raw_html'].replace('<head>', f'<head><base href="{target_url}">')
+                print_btn = '<div style="text-align:center;padding:20px;background:#fff;"><button onclick="window.print()" style="padding:10px 20px;font-size:16px;cursor:pointer;background:#000;color:#fff;border-radius:4px;font-weight:bold;">🖨️ Print Marksheet</button></div>'
+                beu_html = beu_html.replace('</form>', f'{print_btn}</form>')
+                if print_btn not in beu_html:
+                    beu_html = beu_html.replace('</body>', f'{print_btn}</body>')
+                st.components.v1.html(beu_html, height=1000, scrolling=True)
+            elif subject_grades:
                 subj_data = []
                 for col in subject_grades:
                     s_base = col.replace("_Grade", "")
@@ -501,13 +529,14 @@ if st.session_state.results_df is not None:
                     reg_no     = student.get('Registration No', 'N/A')
                     name_val   = student.get('Student Name', 'N/A')
 
-                    # CGPA History — fetch real SGPAs for previous semesters
+                    # CGPA history row — fill current sem, rest NA
                     sem_order = ["I","II","III","IV","V","VI","VII","VIII"]
                     # Sentinel → (semester_roman, batch, exam_held) for each sem
                     SEM_PROBES = {
                         "I":   ("I",   23, "ASPX_2023_SEM1"),
                         "II":  ("II",  23, "ASPX_2023_SEM2"),
                         "III": ("III", 23, "July/2025"),
+                        "IV":  ("IV",  23, "December/2025"),
                     }
 
                     @st.cache_data(show_spinner=False)
@@ -516,7 +545,8 @@ if st.session_state.results_df is not None:
                             return None
                         s_roman, batch, exam = SEM_PROBES[sem]
                         try:
-                            r = client.fetch_result(reg_no, s_roman, batch, exam)
+                            # Use internal client for caching
+                            r = BEUApiClient().fetch_result(reg_no, s_roman, batch, exam)
                             if r:
                                 sgpa_raw = r.get("sgpa")
                                 if isinstance(sgpa_raw, list) and sgpa_raw:
@@ -532,9 +562,20 @@ if st.session_state.results_df is not None:
 
                     current_sem_idx = sem_order.index(sem_val) if sem_val in sem_order else -1
                     sem_sgpas = {}   # sem -> float or None
-                    for s in sem_order[:current_sem_idx]:      # previous sems
-                        sem_sgpas[s] = _fetch_sem_sgpa(reg_no, s)
-                    sem_sgpas[sem_val] = student.get('SGPA')   # current sem from df
+                    sgpa_list = r_marksheet.get('sgpa') if r_marksheet else None
+
+                    if isinstance(sgpa_list, list) and any(x is not None for x in sgpa_list):
+                        # Native history is available!
+                        for i, s in enumerate(sem_order):
+                            if i < len(sgpa_list) and sgpa_list[i] is not None:
+                                try: sem_sgpas[s] = float(sgpa_list[i])
+                                except: sem_sgpas[s] = None
+                            else:
+                                sem_sgpas[s] = None
+                    else:
+                        for s in sem_order[:current_sem_idx]:      # previous sems
+                            sem_sgpas[s] = _fetch_sem_sgpa(reg_no, s)
+                        sem_sgpas[sem_val] = student.get('SGPA')   # current sem from df
 
                     # Build CGPA history cells
                     filled = [v for v in sem_sgpas.values() if v is not None and not (isinstance(v, float) and pd.isna(v))]
@@ -543,147 +584,230 @@ if st.session_state.results_df is not None:
                     for s in sem_order:
                         v = sem_sgpas.get(s)
                         if v is None or (isinstance(v, float) and pd.isna(v)):
-                            cgpa_cells += '<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-size:13px;color:#999;">NA</td>'
+                            cgpa_cells += '<td style="border:1px solid #444;padding:6px 8px;text-align:center;font-size:12px;color:#666;">-</td>'
                         else:
-                            cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-size:13px;font-weight:600;">{v:.2f}</td>'
-                    rc = f"{running_cgpa:.2f}" if running_cgpa else "N/A"
-                    cgpa_cells += f'<td style="border:1px solid #999;padding:5px 8px;text-align:center;font-weight:700;font-size:13px;">{rc}</td>'
+                            cgpa_cells += f'<td style="border:1px solid #444;padding:6px 8px;text-align:center;font-size:12px;">{v:.1f}</td>'
+                    rc = f"{running_cgpa:.1f}" if running_cgpa else "-"
+                    cgpa_cells += f'<td style="border:1px solid #444;padding:6px 8px;text-align:center;font-size:12px;">{rc}</td>'
                     # Update cgpa_val display too
                     cgpa_val = rc
 
-
                     remark_text = "" if status_val == "PASS" else "BACK"
-                    remark_color = "#166534" if status_val == "PASS" else "#991b1b"
+                    remark_color = "#e11d48" if status_val != "PASS" else "#444"
 
-                    marksheet_html = f"""
-<style>
-#beu-ms {{ font-family:'Times New Roman',serif; max-width:900px; margin:0 auto;
-    border:2px solid #333; background:#fff; box-shadow:0 4px 24px rgba(0,0,0,.18); }}
-#beu-ms table {{ border-collapse:collapse; }}
-#beu-ms th {{ background:#333; color:#fff; padding:7px 10px; border:1px solid #999; font-size:13px; }}
+                    mother = student.get('Mother Name', 'N/A')
+                    if pd.isna(mother): mother = ""
+
+                    # We need to split subjects into Theory and Practical for the JSON API df too.
+                    # Since df columns are "Sub_name_Grade", we can guess based on 'Lab' or 'P'
+                    theory_rows_html = ""
+                    prac_rows_html = ""
+                    for i, s in enumerate(subj_data):
+                        bg = "#fff"
+                        is_prac = ("Lab" in s['name'] or "Practical" in s['name'] or "Sessional" in s['name'] or s['name'].endswith(" P"))
+                        
+                        # Fake subject code if not present
+                        scode = s.get('code', '-')
+                        
+                        # Handle credit formatting properly
+                        c_val = s['credit']
+                        if isinstance(c_val, (int, float)) and pd.notna(c_val):
+                            c_str = f"{c_val:.0f}"
+                        elif isinstance(c_val, str) and c_val.replace('.', '', 1).isdigit():
+                            c_str = f"{float(c_val):.0f}"
+                        else:
+                            c_str = str(c_val)
+
+                        row_html = (
+                            f'<tr align="left">\n'
+                            f'<td align="center">{scode}</td>\n'
+                            f'<td align="left">{s["name"].upper()}</td>\n'
+                            f'<td align="center">{s["ese"]}</td>\n'
+                            f'<td align="center">{s["ia"]}</td>\n'
+                            f'<td align="center">{s["total"]}</td>\n'
+                            f'<td align="center">{s["grade"].replace("+", " ")}</td>\n'
+                            f'<td align="center">{c_str}</td>\n'
+                            f'</tr>\n'
+                        )
+                        if is_prac:
+                            prac_rows_html += row_html
+                        else:
+                            theory_rows_html += row_html
+
+                    import base64
+                    import os
+                    logo_path = os.path.join(os.path.dirname(__file__), "images", "BEUP_ENlogo1.png")
+                    logo_b64 = ""
+                    if os.path.exists(logo_path):
+                        with open(logo_path, "rb") as f:
+                            logo_b64 = base64.b64encode(f.read()).decode()
+
+                    # Find SGPA numeric value
+                    sgpa_numeric = f"{student.get('SGPA', 0):.2f}"
+                    if pd.isna(student.get('SGPA')):
+                        sgpa_numeric = sgpa_val
+                    
+                    college_code = student.get('College Code', '')
+                    if pd.isna(college_code) or not college_code:
+                        college_code = ""
+                    else:
+                        college_code = f"{college_code} -"
+                    
+                    course_code = student.get('Course Code', '')
+                    if pd.isna(course_code) or not course_code:
+                        course_code = ""
+                    else:
+                        course_code = f"{course_code} -"
+
+                    marksheet_html = f"""<style>
+#printarea {{ font-family: Arial, Tahoma, sans-serif; font-size: 13px; max-width: 900px; margin: 0 auto; background: #fff; color: #000; padding: 20px; }}
+#printarea table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+#printarea th, #printarea td {{ border: 1px solid #000; padding: 10px; }}
+#printarea td {{ text-align: center; }}
+#printarea td.left-align {{ text-align: left; }}
+#printarea th {{ text-align: center; font-weight: bold; background-color: #fff; }}
+.info-table th, .info-table td {{ padding: 8px 10px; border: 1px solid #000; }}
+.info-table td.label-col {{ width: 15%; font-weight: bold; text-align: left; }}
+.info-table td.data-col {{ text-align: left; }}
 @media print {{
-  .stApp>header,.stSidebar,div[data-testid="stToolbar"],div[data-testid="stDecoration"],
-  .stButton,footer {{ display:none!important; }}
-  #beu-ms {{ box-shadow:none; border:1.5px solid #000; max-width:100%; }}
+  .stApp>header, .stSidebar, div[data-testid="stToolbar"], div[data-testid="stDecoration"], .stButton, footer {{ display: none !important; }}
+  #printarea {{ border: none; width: 100%; max-width: none; padding: 0; }}
 }}
 </style>
-<div id="beu-ms">
-
-  <!-- University Header -->
-  <div style="text-align:center;padding:14px 20px 10px;border-bottom:2px solid #333;">
-    <div style="font-size:1.05rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">
-      Bihar Engineering University, Patna
+<div id="printarea">
+    <div style="display:flex;align-items:center;margin-bottom:20px;">
+        <div style="flex:0 0 100px;">
+            <img src="data:image/png;base64,{logo_b64}" width="90" />
+        </div>
+        <div style="flex:1;text-align:center;">
+            <div style="font-size: 24px; font-weight: bold; text-transform: uppercase;">Bihar Engineering University, Patna</div>
+            <div style="font-size: 16px; font-weight: bold; color: red; margin-top: 5px;">B.Tech. {sem_val}{"^{th}" if sem_val.isdigit() else ""} Semester Examination, {exam_held.split('/')[-1]}</div>
+        </div>
+        <div style="flex:0 0 100px;"></div>
     </div>
-  </div>
-
-  <!-- Exam Title -->
-  <div style="text-align:center;padding:8px 20px;border-bottom:1px solid #ccc;">
-    <span style="font-size:1.1rem;font-weight:700;color:#cc0000;">
-      B.Tech. {sem_val} Semester Examination, {exam_held}
-    </span>
-  </div>
-
-  <!-- Navigation link -->
-  <div style="text-align:right;padding:6px 16px;border-bottom:1px solid #ccc;">
-    <span style="font-size:12px;color:#1d4ed8;cursor:pointer;">View another Result</span>
-  </div>
-
-  <!-- Student Info Box -->
-  <div style="padding:10px 16px;border-bottom:1px solid #ccc;">
-    <table style="width:100%;font-size:13px;">
-      <tr>
-        <td style="padding:3px 6px;width:15%;"><b>Registration No:</b></td>
-        <td style="padding:3px 6px;" colspan="3"><b>{reg_no}</b></td>
-      </tr>
-      <tr>
-        <td style="padding:3px 6px;"><b>Student Name:</b></td>
-        <td style="padding:3px 6px;" colspan="3"><b>{name_val}</b></td>
-      </tr>
-      <tr>
-        <td style="padding:3px 6px;"><b>Father Name:</b></td>
-        <td style="padding:3px 6px;">{father}</td>
-        <td style="padding:3px 6px;"><b>Branch:</b></td>
-        <td style="padding:3px 6px;">{branch}</td>
-      </tr>
-      <tr>
-        <td style="padding:3px 6px;"><b>College:</b></td>
-        <td style="padding:3px 6px;" colspan="3">{college}</td>
-      </tr>
-    </table>
-  </div>
-
-  <!-- Theory Subjects Table -->
-  <div style="padding:10px 16px 6px;">
-    <table style="width:100%;caption-side:top;">
-      <caption style="text-align:center;font-weight:700;font-size:14px;padding:4px 0 6px;">THEORY</caption>
-      <thead>
+    
+    <table class="info-table" style="margin-bottom: 0; border-bottom: none;">
         <tr>
-          <th style="text-align:left;min-width:220px;">Subject Name</th>
-          <th>ESE</th><th>IA</th><th>Total</th><th>Grade</th><th>Credit</th>
+            <td class="label-col">Semester:</td>
+            <td class="data-col" style="width: 35%;">{sem_val}</td>
+            <td class="label-col" style="width: 20%;">Examination(Month/Year):</td>
+            <td class="data-col" style="width: 30%;">{exam_held.upper()}</td>
         </tr>
-      </thead>
-      <tbody>{rows_html}</tbody>
     </table>
-  </div>
-
-  <!-- SGPA Row -->
-  <div style="padding:6px 16px 4px;text-align:right;font-size:14px;font-weight:700;border-top:1px solid #ccc;">
-    SGPA : <span style="font-size:1.2rem;">{sgpa_val}</span>
-  </div>
-
-  <!-- CGPA History Table -->
-  <div style="padding:6px 16px 10px;border-top:1px solid #ccc;">
-    <table style="width:100%;">
-      <thead>
+    
+    <table class="info-table">
         <tr>
-          <th colspan="2" style="text-align:left;padding:5px 8px;border:1px solid #999;font-size:13px;background:#444;">Semester</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">I</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">II</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">III</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">IV</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">V</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">VI</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">VII</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">VIII</th>
-          <th style="border:1px solid #999;padding:5px 8px;font-size:13px;background:#444;">Cur. CGPA</th>
+            <td class="label-col" style="width: 15%;">Registration No:</td>
+            <td class="data-col" colspan="3" style="font-weight: bold;">{reg_no}</td>
         </tr>
-      </thead>
-      <tbody>
         <tr>
-          <td colspan="2" style="border:1px solid #999;padding:5px 8px;font-size:13px;font-weight:700;">SGPA</td>
-          {cgpa_cells}
+            <td class="label-col">Student Name:</td>
+            <td class="data-col" colspan="3" style="font-weight: bold;">{name_val.upper()}</td>
         </tr>
-      </tbody>
+        <tr>
+            <td class="label-col">Father Name:</td>
+            <td class="data-col" style="width: 35%;">{father.upper()}</td>
+            <td class="label-col" style="width: 15%;">Mother Name:</td>
+            <td class="data-col" style="width: 35%;">{mother.upper()}</td>
+        </tr>
+        <tr>
+            <td class="label-col">College Name:</td>
+            <td class="data-col" colspan="3">{college_code} {college.upper()}</td>
+        </tr>
+        <tr>
+            <td class="label-col">Course Name:</td>
+            <td class="data-col" colspan="3">{course_code} {branch.upper()}</td>
+        </tr>
     </table>
-  </div>
-
-  <!-- Remarks & Publish Date -->
-  <div style="padding:8px 16px;border-top:1px solid #ccc;font-size:13px;display:flex;justify-content:space-between;">
-    <div>
-      <b>Remarks:</b>
-      <span style="color:{remark_color};font-weight:700;">{remark_text}</span>
+    
+    <table>
+        <tr>
+            <td colspan="7" style="font-weight: bold; text-align: center; padding: 12px; background: #fff;">THEORY</td>
+        </tr>
+        <tr>
+            <th style="width: 10%;">Subject<br>Code</th>
+            <th style="text-align: left;">Subject Name</th>
+            <th style="width: 8%;">ESE</th>
+            <th style="width: 8%;">IA</th>
+            <th style="width: 8%;">Total</th>
+            <th style="width: 8%;">Grade</th>
+            <th style="width: 8%;">Credit</th>
+        </tr>
+        {theory_rows_html.replace('align="left"', 'class="left-align"').replace('align="center"', '')}
+        
+        {"" if not prac_rows_html else f'''
+        <tr>
+            <td colspan="7" style="font-weight: bold; text-align: center; padding: 12px; border-top: 2px solid #000; background: #fff;">PRACTICAL</td>
+        </tr>
+        <tr>
+            <th style="width: 10%;">Subject<br>Code</th>
+            <th style="text-align: left;">Subject Name</th>
+            <th style="width: 8%;">ESE</th>
+            <th style="width: 8%;">IA</th>
+            <th style="width: 8%;">Total</th>
+            <th style="width: 8%;">Grade</th>
+            <th style="width: 8%;">Credit</th>
+        </tr>
+        {prac_rows_html.replace('align="left"', 'class="left-align"').replace('align="center"', '')}
+        '''}
+        
+        <tr>
+            <td colspan="7" style="text-align: right; font-weight: bold; padding: 12px; border-top: 2px solid #000;">SGPA : {sgpa_numeric}</td>
+        </tr>
+    </table>
+    
+    <table>
+        <tr>
+            <th colspan="10" style="padding: 12px; background: #fff;">SGPA / CGPA</th>
+        </tr>
+        <tr>
+            <th style="width: 12%;">Semester</th>
+            <th style="width: 8%;">I</th>
+            <th style="width: 8%;">II</th>
+            <th style="width: 8%;">III</th>
+            <th style="width: 8%;">IV</th>
+            <th style="width: 8%;">V</th>
+            <th style="width: 8%;">VI</th>
+            <th style="width: 8%;">VII</th>
+            <th style="width: 8%;">VIII</th>
+            <th style="width: 16%;">Cur. CGPA</th>
+        </tr>
+        <tr>
+            <td style="font-weight: bold;">SGPA</td>
+            {cgpa_cells.replace('<td style="border:1px solid #000;padding:6px 8px;text-align:center;font-size:12px;">', '<td>').replace('<td style="border:1px solid #000;padding:6px 8px;text-align:center;font-size:12px;color:#666;">-</td>', '<td>-</td>')}
+        </tr>
+    </table>
+    
+    <table class="info-table" style="margin-bottom: 20px;">
+        <tr>
+            <td class="label-col" style="width: 15%;">Remarks :</td>
+            <td class="data-col" style="font-weight: bold;">{remark_text.upper()}</td>
+        </tr>
+    </table>
+    
+    <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+        <div><b>Publish Date: </b></div>
+        <div style="text-align: center;">
+            <br/><br/>
+            <b>Controller of Examination</b>
+        </div>
     </div>
-    <div style="color:#555;font-size:12px;">WEB COPY — Not valid for official purpose</div>
-  </div>
+    
+    <div style="margin-top: 30px; font-size: 11px;">
+        <b>NOTE:</b><br/>
+        ESE: End Semester Exam | IA: Internal Assessment | SGPA: Semester Grade Point Average | CGPA: Cumulative Grade Point Average<br/>
+        AB: Absent | NA: Not Applicable<br/>
+        Grade: O &gt; A+ &gt; A &gt; B+ &gt; B &gt; C &gt; D &gt; F(Fail)
+    </div>
 
-  <!-- Notes -->
-  <div style="padding:8px 16px;border-top:1px solid #ccc;font-size:11.5px;color:#555;">
-    <b>NOTE:</b>
-    ESE: End Semester Exam &nbsp;|&nbsp; IA: Internal Assessment &nbsp;|&nbsp;
-    SGPA: Semester Grade Point Average &nbsp;|&nbsp; CGPA: Cumulative Grade Point Average &nbsp;|&nbsp;
-    AB: Absent &nbsp;|&nbsp; NA: Not Applicable &nbsp;|&nbsp;
-    Grade: O &gt; A+ &gt; A &gt; B+ &gt; B &gt; C &gt; D &gt; F(Fail)
-  </div>
-
-  <!-- Print Button -->
-  <div style="text-align:center;padding:10px;border-top:1px solid #ccc;">
-    <button onclick="window.print()"
-      style="background:#1e3a8a;color:#fff;border:none;padding:8px 28px;border-radius:6px;
-      font-size:14px;cursor:pointer;font-family:sans-serif;">🖨️ Print Marksheet</button>
-  </div>
-
+    <div style="text-align:center;padding:20px;">
+        <button onclick="window.print()" style="background:#000;color:#fff;border:none;padding:10px 24px;font-size:14px;cursor:pointer;border-radius:4px;font-weight:bold;">Print Result</button>
+    </div>
 </div>"""
-                    st.markdown(marksheet_html, unsafe_allow_html=True)
+                    if hasattr(st, "html"):
+                        st.html(marksheet_html)
+                    else:
+                        st.markdown(marksheet_html, unsafe_allow_html=True)
                 else:
                     st.info("No subject grades found for this student.")
             else:

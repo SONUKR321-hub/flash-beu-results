@@ -3,8 +3,12 @@ import requests
 import time
 import logging
 import re
+import urllib3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional, Any
+
+# Disable SSL warnings for BEU legacy ASPX servers
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +19,7 @@ BASE_URL = "https://www.beu-bih.ac.in/backend/v1/result/get-result"
 class BEUApiClient:
     def __init__(self):
         self.session = requests.Session()
+        self.session.verify = False  # Critical for old BEU ASPX portals with expired certs
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
@@ -23,18 +28,23 @@ class BEUApiClient:
 
     def fetch_result(self, registration_no: str, semester: str, batch_year: int, exam_held: str) -> Optional[Dict[str, Any]]:
         """
-        Fetches a single result from the BEU API.
-        
-        Args:
-            registration_no: The full registration number.
-            semester: Roman numeral of the semester (e.g., 'I', 'III').
-            batch_year: The 2-digit batch year (e.g., 23).
-            exam_held: String like "July/2025" or "ASPX_2023_SEM1".
+        Fetches a single result from the BEU API or legacy ASPX portals.
         """
+        # Explicit markers used for automated fetching
         if exam_held == "ASPX_2023_SEM1":
             return self._fetch_aspx_2023_sem1(registration_no)
         if exam_held == "ASPX_2023_SEM2":
             return self._fetch_aspx_2023_sem2(registration_no)
+
+        # Dynamic routing for UI searches based on target batch and semester
+        try:
+            b_yr = int(batch_year)
+            if b_yr == 23 and semester == "I":
+                return self._fetch_aspx_2023_sem1(registration_no)
+            if b_yr == 23 and semester == "II":
+                return self._fetch_aspx_2023_sem2(registration_no)
+        except Exception:
+            pass
 
         params = {
             "year": batch_year,
@@ -153,44 +163,62 @@ class BEUApiClient:
                 return None
             sgpa_str = _get(r'id="ContentPlaceHolder1_DataList5_GROSSTHEORYTOTALLabel_0"[^>]*>([^<]+)</span>')
             father = _get(r'id="ContentPlaceHolder1_DataList1_FatherNameLabel_0"[^>]*>([^<]+)</span>')
+            mother = _get(r'id="ContentPlaceHolder1_DataList1_MotherNameLabel_0"[^>]*>([^<]+)</span>')
             college_code = _get(r'id="ContentPlaceHolder1_DataList1_CollegeCodeLabel_0"[^>]*>([^<]+)</span>')
             college_name = _get(r'id="ContentPlaceHolder1_DataList1_CollegeNameLabel_0"[^>]*>([^<]+)</span>')
             course_name = _get(r'id="ContentPlaceHolder1_DataList1_CourseLabel_0"[^>]*>([^<]+)</span>')
             remark = _get(r'id="ContentPlaceHolder1_DataList3_remarkLabel_0"[^>]*>([^<]*)</span>')
             status = "PASS" if not remark else "FAIL"
-            theory_rows = re.findall(
-                r'<td align="center">(\d+)</td><td align="left">([^<]+)</td>'
-                r'<td align="center">([^<]+)</td><td align="center">([^<]+)</td>'
-                r'<td align="center">([^<]+)</td><td align="center">([^<]+)</td>'
-                r'<td align="center">([^<]+)</td>',
-                html
-            )
-            theory_subjects = []
-            for row in theory_rows:
-                code, subj_name, ese, ia, total, grade, credit = row
-                try:
-                    credit_f = float(credit)
-                except ValueError:
-                    credit_f = None
-                theory_subjects.append({
-                    "code": code, "name": subj_name.strip(),
-                    "ese": ese.strip(), "ia": ia.strip(),
-                    "total": total.strip(), "grade": grade.strip(), "credit": credit_f,
-                })
+            
+            # Helper to extract subjects from a specific HTML block
+            def _extract_subjects(html_block):
+                rows = re.findall(
+                    r'<td align="center">([^<]+)</td><td align="left">([^<]+)</td>'
+                    r'<td align="center">([^<]+)</td><td align="center">([^<]+)</td>'
+                    r'<td align="center">([^<]+)</td><td align="center">([^<]+)</td>'
+                    r'<td align="center">([^<]+)</td>',
+                    html_block
+                )
+                subjects = []
+                for row in rows:
+                    code, subj_name, ese, ia, total, grade, credit = row
+                    try: credit_f = float(credit)
+                    except ValueError: credit_f = None
+                    subjects.append({
+                        "code": code.strip(), "name": subj_name.strip(),
+                        "ese": ese.strip(), "ia": ia.strip(),
+                        "total": total.strip(), "grade": grade.strip(), "credit": credit_f,
+                    })
+                return subjects
+
+            # Isolate GridView1 (Theory) and GridView2 (Practical) blocks
+            theory_block = ""
+            prac_block = ""
+            gv1_match = re.search(r'id="ContentPlaceHolder1_GridView1"[^>]*>(.*?)</table>', html, re.DOTALL)
+            if gv1_match: theory_block = gv1_match.group(1)
+            
+            gv2_match = re.search(r'id="ContentPlaceHolder1_GridView2"[^>]*>(.*?)</table>', html, re.DOTALL)
+            if gv2_match: prac_block = gv2_match.group(1)
+
+            theory_subjects = _extract_subjects(theory_block)
+            practical_subjects = _extract_subjects(prac_block)
+
             return {
                 "redg_no": registration_no,
-                "name": name,
-                "father_name": father,
-                "college_code": college_code,
-                "college_name": college_name.title() if college_name else None,
-                "course": course_name.title() if course_name else None,
+                "name": name.strip(),
+                "father_name": father.strip() if father else None,
+                "mother_name": mother.strip() if mother else None,
+                "college_code": college_code.strip() if college_code else None,
+                "college_name": college_name.strip().title() if college_name else None,
+                "course": course_name.strip().title() if course_name else None,
                 "semester": semester,
                 "exam_held": exam_held,
                 "sgpa": [sgpa_str] if sgpa_str else [],
                 "cgpa": sgpa_str,
                 "fail_any": status,
                 "theorySubjects": theory_subjects,
-                "practicalSubjects": [],
+                "practicalSubjects": practical_subjects,
+                "raw_html": html,
             }
         except requests.RequestException as e:
             logger.warning(f"ASPX legacy request failed for {registration_no}: {e}")
