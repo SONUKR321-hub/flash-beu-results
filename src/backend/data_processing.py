@@ -60,6 +60,7 @@ def process_results_to_dataframe(results: List[Dict[str, Any]]) -> pd.DataFrame:
         practical = res.get("practicalSubjects", [])
 
         flat["Theory Failure Count"] = 0
+        total_marks = 0.0
 
         if theory:
             for i, subj in enumerate(theory):
@@ -70,7 +71,10 @@ def process_results_to_dataframe(results: List[Dict[str, Any]]) -> pd.DataFrame:
                 flat[f"Sub_{s_name}_ESE"] = subj.get("ese")
                 flat[f"Sub_{s_name}_IA"] = subj.get("ia")
                 flat[f"Sub_{s_name}_Total"] = subj.get("total")
-                if s_grade in ("F", "Ab"):
+                t_val = clean_value(subj.get("total"))
+                if not np.isnan(t_val):
+                    total_marks += t_val
+                if s_grade in ("F", "Ab", "AB"):
                     flat["Theory Failure Count"] += 1
 
         if practical:
@@ -81,7 +85,11 @@ def process_results_to_dataframe(results: List[Dict[str, Any]]) -> pd.DataFrame:
                 flat[f"Sub_{s_name}_IA"] = subj.get("ia")
                 flat[f"Sub_{s_name}_ESE"] = subj.get("ese")
                 flat[f"Sub_{s_name}_Total"] = subj.get("total")
+                t_val = clean_value(subj.get("total"))
+                if not np.isnan(t_val):
+                    total_marks += t_val
 
+        flat["Total Marks"] = total_marks
         data.append(flat)
 
     df = pd.DataFrame(data)
@@ -91,45 +99,42 @@ def process_results_to_dataframe(results: List[Dict[str, Any]]) -> pd.DataFrame:
 def calculate_ranks(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculates University, College, and Class (Branch+College) ranks for students.
-    All ranks based on SGPA descending (ties share same rank).
+    All ranks based on SGPA descending, then CGPA, then Total Marks.
     """
     if df.empty:
         return df
 
-    # We use SGPA for ranking as requested, fallback to CGPA if SGPA is missing
-    rank_col = "SGPA" if "SGPA" in df.columns else "CGPA"
+    # We use SGPA, then CGPA, then Total Marks to establish ranking order
+    rank_cols = []
+    for c in ["SGPA", "CGPA", "Total Marks"]:
+        if c in df.columns:
+            rank_cols.append(c)
+            
+    if not rank_cols:
+        return df
+
+    def get_ranks(group_df):
+        return group_df[rank_cols].fillna(-1).apply(tuple, axis=1).rank(method="min", ascending=False).astype(int)
 
     # University Rank — global, across all fetched students
-    df["University Rank"] = df[rank_col].rank(ascending=False, method="min").fillna(0).astype(int)
+    df["University Rank"] = get_ranks(df)
 
     # College Rank — within the same college
     if "College Code" in df.columns:
-        df["College Rank"] = (
-            df.groupby("College Code")[rank_col]
-            .rank(ascending=False, method="min")
-            .fillna(0).astype(int)
-        )
+        df["College Rank"] = df.groupby("College Code", group_keys=False).apply(get_ranks)
     else:
         df["College Rank"] = df["University Rank"]
 
     # Branch Rank — within the same branch across all colleges
     if "Branch" in df.columns:
-        df["Branch Rank"] = (
-            df.groupby("Branch")[rank_col]
-            .rank(ascending=False, method="min")
-            .fillna(0).astype(int)
-        )
+        df["Branch Rank"] = df.groupby("Branch", group_keys=False).apply(get_ranks)
     else:
         df["Branch Rank"] = df["University Rank"]
 
     # Class Rank — within the same branch at the same college
     group_cols = [c for c in ["College Code", "Branch"] if c in df.columns]
     if group_cols:
-        df["Class Rank"] = (
-            df.groupby(group_cols)[rank_col]
-            .rank(ascending=False, method="min")
-            .fillna(0).astype(int)
-        )
+        df["Class Rank"] = df.groupby(group_cols, group_keys=False).apply(get_ranks)
     else:
         df["Class Rank"] = df["University Rank"]
 

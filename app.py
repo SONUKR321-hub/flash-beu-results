@@ -69,11 +69,12 @@ with st.sidebar:
     semester_roman = SEMESTER_MAPPING[semester_num]
 
     st.markdown("### Institution")
+    college_options = ["ALL"] + list(COLLEGE_CODES.keys())
     college_code = st.selectbox(
         "College",
-        options=list(COLLEGE_CODES.keys()),
-        format_func=lambda x: f"{x} - {COLLEGE_CODES[x]}",
-        index=list(COLLEGE_CODES.keys()).index("107"),
+        options=college_options,
+        format_func=lambda x: "ALL 38 COLLEGES" if x == "ALL" else f"{x} - {COLLEGE_CODES.get(x, x)}",
+        index=college_options.index("107"),
     )
 
     branch_code = st.selectbox(
@@ -140,18 +141,32 @@ with st.sidebar:
                 my_bar.progress(int((idx + 1) / len(dates) * 100), text=f"Checking {date}...")
             return []
 
-        with st.spinner(f"Fetching results for {COLLEGE_CODES.get(college_code, college_code)}..."):
-            if exam_override != "Auto-Detect":
-                st.toast(f"Using forced session: {exam_override}", icon="⚠️")
-                raw_results = client.fetch_batch_results(
-                    start_reg, end_reg, branch_code, college_code,
-                    batch_year, semester_roman, exam_override, include_lateral
-                )
-            else:
-                raw_results = fetch_with_auto_probe(
-                    start_reg, end_reg, branch_code, college_code,
-                    batch_year, semester_roman, include_lateral,
-                )
+        with st.spinner(f"Fetching results..."):
+            colleges_to_fetch = list(COLLEGE_CODES.keys()) if college_code == "ALL" else [college_code]
+            raw_results = []
+            
+            if len(colleges_to_fetch) > 1:
+                col_bar = st.progress(0, text="Fetching data across all 38 colleges...")
+            
+            for i, c_code in enumerate(colleges_to_fetch):
+                if len(colleges_to_fetch) > 1:
+                    col_bar.progress(int((i / len(colleges_to_fetch)) * 100), text=f"Fetching college {c_code}...")
+                    
+                if exam_override != "Auto-Detect":
+                    c_results = client.fetch_batch_results(
+                        start_reg, end_reg, branch_code, c_code,
+                        batch_year, semester_roman, exam_override, include_lateral
+                    )
+                else:
+                    c_results = fetch_with_auto_probe(
+                        start_reg, end_reg, branch_code, c_code,
+                        batch_year, semester_roman, include_lateral,
+                    )
+                if c_results:
+                    raw_results.extend(c_results)
+            
+            if len(colleges_to_fetch) > 1:
+                col_bar.empty()
 
             if raw_results:
                 df = process_results_to_dataframe(raw_results)
