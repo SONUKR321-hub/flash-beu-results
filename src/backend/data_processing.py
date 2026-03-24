@@ -113,30 +113,44 @@ def calculate_ranks(df: pd.DataFrame) -> pd.DataFrame:
     if not rank_cols:
         return df
 
-    def get_ranks(group_df):
+    def get_ranks_series(group_df):
+        if group_df.empty:
+            return pd.Series(dtype=int)
+        # For single row groups, rank is always 1
+        if len(group_df) == 1:
+            return pd.Series([1], index=group_df.index)
+        
+        # Multiple columns ranking by converting to tuples
         return group_df[rank_cols].fillna(-1).apply(tuple, axis=1).rank(method="min", ascending=False).astype(int)
 
     # University Rank — global, across all fetched students
-    df["University Rank"] = get_ranks(df)
+    df["University Rank"] = get_ranks_series(df)
 
-    # College Rank — within the same college
-    if "College Code" in df.columns:
-        df["College Rank"] = df.groupby("College Code", group_keys=False).apply(get_ranks)
-    else:
-        df["College Rank"] = df["University Rank"]
+    # Grouped ranks: College, Branch, and Class (Branch + College)
+    grouping_configs = [
+        ("College Rank", ["College Code"]),
+        ("Branch Rank", ["Branch"]),
+        ("Class Rank", ["College Code", "Branch"])
+    ]
 
-    # Branch Rank — within the same branch across all colleges
-    if "Branch" in df.columns:
-        df["Branch Rank"] = df.groupby("Branch", group_keys=False).apply(get_ranks)
-    else:
-        df["Branch Rank"] = df["University Rank"]
-
-    # Class Rank — within the same branch at the same college
-    group_cols = [c for c in ["College Code", "Branch"] if c in df.columns]
-    if group_cols:
-        df["Class Rank"] = df.groupby(group_cols, group_keys=False).apply(get_ranks)
-    else:
-        df["Class Rank"] = df["University Rank"]
+    for col_name, keys in grouping_configs:
+        # Check if we have the necessary columns for this grouping
+        available_keys = [k for k in keys if k in df.columns]
+        if available_keys:
+            # Default to University Rank if grouping fails or for excluded rows (like NaNs in keys)
+            df[col_name] = df["University Rank"]
+            try:
+                # Iterate through groups for a more stable assignment than .apply()
+                # dropna=True (default) means rows with NaN in keys won't be in any group
+                for _, group in df.groupby(available_keys):
+                    if not group.empty:
+                        ranks = get_ranks_series(group)
+                        df.loc[group.index, col_name] = ranks
+            except Exception:
+                # Robust fallback
+                pass
+        else:
+            df[col_name] = df["University Rank"]
 
     return df
 
