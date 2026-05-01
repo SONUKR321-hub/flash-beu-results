@@ -98,7 +98,7 @@ with st.sidebar:
     
     exam_override = st.selectbox(
         "Manual Exam Session Override (Optional)",
-        ["Auto-Detect", "January/2026", "December/2025", "November/2025", "July/2025", "May/2025", "Dec/2024", "Sep/2024", "Aug/2024", "July/2024", "May/2024", "Dec/2023"],
+        ["Auto-Detect", "February/2026", "January/2026", "December/2025", "November/2025", "July/2025", "May/2025", "Dec/2024", "Sep/2024", "Aug/2024", "July/2024", "May/2024", "Dec/2023"],
         index=0
     )
     
@@ -116,7 +116,7 @@ with st.sidebar:
 
         def fetch_with_auto_probe(start, end, branch, college, batch, sem, lateral):
             dates = [
-                "January/2026", "December/2025", "November/2025", "July/2025", "May/2025",
+                "February/2026", "January/2026", "December/2025", "November/2025", "July/2025", "May/2025",
                 "Dec/2024", "Sep/2024", "Aug/2024",
                 "July/2024", "May/2024", "Dec/2023",
             ]
@@ -175,7 +175,7 @@ with st.sidebar:
                 st.success(f"✅ Fetched {len(df)} records!")
             else:
                 st.error("No results found in any recent exam session.")
-                st.info(f"Tried: ASPX 2023 portal, January/2026, December/2025, November/2025, July/2025, May/2025, Dec/2024, Sep/2024, Aug/2024, July/2024, May/2024, Dec/2023.")
+                st.info(f"Tried: ASPX 2023 portal, February/2026, January/2026, December/2025, November/2025, July/2025, May/2025, Dec/2024, Sep/2024, Aug/2024, July/2024, May/2024, Dec/2023.")
                 st.warning("**Tips:** Check batch year, semester, and branch code.")
                 if batch_year == 24:
                     check_23 = client.fetch_batch_results(
