@@ -94,41 +94,83 @@ class BEUApiClient:
             return None
 
 
+    def find_active_colleges(
+        self,
+        branch_code: str,
+        batch_year: int,
+        semester: str,
+        exam_held: str,
+        college_codes_list: List[str]
+    ) -> List[str]:
+        """
+        Probes a list of colleges (rolls 001 and 002) in parallel to find which ones offer the branch
+        and have results published for this semester/exam session.
+        """
+        active_colleges = []
+        tasks = {}
+        
+        # Adjust thread pool size dynamically up to 60 workers
+        max_workers = min(60, len(college_codes_list) * 2)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for c_code in college_codes_list:
+                for roll in ["001", "002"]:
+                    reg_no = f"{batch_year}{branch_code}{c_code}{roll}"
+                    # Probing using fetch_result
+                    future = executor.submit(self.fetch_result, reg_no, semester, batch_year, exam_held)
+                    tasks[future] = c_code
+                    
+            for future in as_completed(tasks):
+                c_code = tasks[future]
+                res = future.result()
+                if res and c_code not in active_colleges:
+                    active_colleges.append(c_code)
+                    
+        return active_colleges
+
     def fetch_batch_results(
         self, 
         start_reg: int, 
         end_reg: int, 
         branch_code: str, 
-        college_code: str, 
+        college_code: Any, 
         batch_year: int, 
         semester: str, 
         exam_held: str,
         include_lateral: bool = False,
-        workers: int = 10
+        workers: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Fetches results for a range of students.
+        Supports single college_code (str) or multiple college_codes (list/tuple/set/iterable).
         """
+        if isinstance(college_code, str):
+            colleges = [college_code]
+        else:
+            colleges = list(college_code)
+
         results = []
         tasks = {}
 
-        # Generator for registration numbers
+        # Generator for registration numbers across all target colleges
         def generate_reg_nos():
-            # Regular students
-            for i in range(start_reg, end_reg + 1):
-                yield f"{batch_year}{branch_code}{college_code}{i:03d}", batch_year
-            
-            # Lateral Entry (LE) students
-            # LE students usually join a year later but represent the same batch theoretically for exams?
-            # Reference repo says: LE Batch = Batch + 1. Reg IDs 901-930.
-            if include_lateral:
-                le_batch = batch_year + 1
-                for i in range(901, 931):
-                    yield f"{le_batch}{branch_code}{college_code}{i:03d}", le_batch
+            for c_code in colleges:
+                # Regular students
+                for i in range(start_reg, end_reg + 1):
+                    yield f"{batch_year}{branch_code}{c_code}{i:03d}", batch_year
+                
+                # Lateral Entry (LE) students
+                if include_lateral:
+                    le_batch = batch_year + 1
+                    for i in range(901, 931):
+                        yield f"{le_batch}{branch_code}{c_code}{i:03d}", le_batch
+
+        # Adjust workers dynamically if fetching multiple colleges in parallel
+        if workers is None:
+            workers = min(60, len(colleges) * 15)
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             for reg_no, year_param in generate_reg_nos():
-                # Note: The API 'year' param usually matches the registration prefix.
                 future = executor.submit(self.fetch_result, reg_no, semester, year_param, exam_held)
                 tasks[future] = reg_no
 
@@ -138,6 +180,7 @@ class BEUApiClient:
                     results.append(res)
         
         return results
+
 
     def _fetch_aspx_2023_sem1(self, registration_no: str) -> Optional[Dict[str, Any]]:
         return self._fetch_aspx_legacy(

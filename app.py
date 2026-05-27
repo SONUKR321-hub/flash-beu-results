@@ -115,75 +115,82 @@ with st.sidebar:
     if st.button("🚀 Fetch Results", use_container_width=True, type="primary"):
         client = BEUApiClient()
 
-        def fetch_with_auto_probe(start, end, branch, college, batch, sem, lateral):
-            dates = [
-                "February/2026", "January/2026", "December/2025", "November/2025", "July/2025", "May/2025",
-                "Dec/2024", "Sep/2024", "Aug/2024",
-                "July/2024", "May/2024", "Dec/2023",
-            ]
-            # Legacy ASPX portal probes for 2023 batch
-            if sem == "I" and batch == 23:
-                dates = ["ASPX_2023_SEM1"] + dates
-            if sem == "II" and batch == 23:
-                dates = ["ASPX_2023_SEM2"] + dates
-            my_bar = st.progress(0, text="Searching for correct exam session...")
-            for idx, date in enumerate(dates):
-                st.toast(f"Trying session: {date}...", icon="🔍")
-                probe_end = start + 9
-                probe_results = client.fetch_batch_results(
-                    start, probe_end, branch, college, batch, sem, date, lateral, workers=10
-                )
-                if probe_results:
-                    st.toast(f"Found data in {date}!", icon="✅")
-                    my_bar.progress(100, text=f"Data found in {date}! Fetching full batch...")
-                    return client.fetch_batch_results(
-                        start, end, branch, college, batch, sem, date, lateral
-                    )
-                my_bar.progress(int((idx + 1) / len(dates) * 100), text=f"Checking {date}...")
-            return []
-
-        with st.spinner(f"Fetching results..."):
-            colleges_to_fetch = list(COLLEGE_CODES.keys()) if college_code == "ALL" else [college_code]
-            raw_results = []
+        with st.spinner("Analyzing exam sessions and active institutions..."):
+            detected_date = None
+            probe_college = college_code if college_code != "ALL" else "107"
             
-            if len(colleges_to_fetch) > 1:
-                col_bar = st.progress(0, text="Fetching data across all 38 colleges...")
-            
-            for i, c_code in enumerate(colleges_to_fetch):
-                if len(colleges_to_fetch) > 1:
-                    col_bar.progress(int((i / len(colleges_to_fetch)) * 100), text=f"Fetching college {c_code}...")
+            # 1. Determine the exam session (date)
+            if exam_override != "Auto-Detect":
+                detected_date = exam_override
+            else:
+                dates = [
+                    "February/2026", "January/2026", "December/2025", "November/2025", "July/2025", "May/2025",
+                    "Dec/2024", "Sep/2024", "Aug/2024",
+                    "July/2024", "May/2024", "Dec/2023",
+                ]
+                if semester_roman == "I" and batch_year == 23:
+                    dates = ["ASPX_2023_SEM1"] + dates
+                if semester_roman == "II" and batch_year == 23:
+                    dates = ["ASPX_2023_SEM2"] + dates
                     
-                if exam_override != "Auto-Detect":
-                    c_results = client.fetch_batch_results(
-                        start_reg, end_reg, branch_code, c_code,
-                        batch_year, semester_roman, exam_override, include_lateral
+                my_bar = st.progress(0, text="Searching for correct exam session...")
+                for idx, date in enumerate(dates):
+                    st.toast(f"Probing session: {date}...", icon="🔍")
+                    # Try probing a small range to see if there is any data for the probe college
+                    probe_results = client.fetch_batch_results(
+                        start_reg, start_reg + 2, branch_code, probe_college, batch_year, semester_roman, date, include_lateral
                     )
-                else:
-                    c_results = fetch_with_auto_probe(
-                        start_reg, end_reg, branch_code, c_code,
-                        batch_year, semester_roman, include_lateral,
-                    )
-                if c_results:
-                    raw_results.extend(c_results)
-            
-            if len(colleges_to_fetch) > 1:
-                col_bar.empty()
+                    if probe_results:
+                        detected_date = date
+                        st.toast(f"Found data in {date}!", icon="✅")
+                        my_bar.progress(100, text=f"Data found in {date}! Probing colleges...")
+                        break
+                    my_bar.progress(int((idx + 1) / len(dates) * 100), text=f"Checking {date}...")
+                
+                if 'my_bar' in locals():
+                    my_bar.empty()
+
+            if detected_date:
+                # 2. Find active colleges offering this branch for the detected date
+                all_colleges = list(COLLEGE_CODES.keys())
+                st.toast("Finding active colleges offering this branch...", icon="🏫")
+                active_colleges = client.find_active_colleges(
+                    branch_code, batch_year, semester_roman, detected_date, all_colleges
+                )
+                
+                if not active_colleges:
+                    # Fallback to at least the probe college
+                    active_colleges = [probe_college]
+                
+                st.toast(f"Found {len(active_colleges)} colleges offering this branch. Fetching all results in parallel...", icon="🚀")
+                
+                # Fetch all active colleges in parallel
+                raw_results = client.fetch_batch_results(
+                    start_reg, end_reg, branch_code, active_colleges,
+                    batch_year, semester_roman, detected_date, include_lateral
+                )
+            else:
+                raw_results = []
 
             if raw_results:
                 df = process_results_to_dataframe(raw_results)
+                # Keep full university-wide dataframe in session state for comparative rankings
                 st.session_state.results_df = df
                 st.session_state.batch_stats = analyze_batch_performance(df)
-                st.success(f"✅ Fetched {len(df)} records!")
+                
+                fetched_count = len(df[df["College Code"].astype(str) == str(college_code)]) if college_code != "ALL" else len(df)
+                st.success(f"✅ Fetched university-wide results! Loaded {fetched_count} records for your college (out of {len(df)} total university-wide records).")
             else:
                 st.error("No results found in any recent exam session.")
                 st.info(f"Tried: ASPX 2023 portal, February/2026, January/2026, December/2025, November/2025, July/2025, May/2025, Dec/2024, Sep/2024, Aug/2024, July/2024, May/2024, Dec/2023.")
                 st.warning("**Tips:** Check batch year, semester, and branch code.")
                 if batch_year == 24:
                     check_23 = client.fetch_batch_results(
-                        start_reg, start_reg, branch_code, college_code, 23, "I", "Dec/2023", include_lateral, workers=1
+                        start_reg, start_reg, branch_code, probe_college, 23, "I", "Dec/2023", include_lateral
                     )
                     if check_23:
                         st.success("✅ Found results for Batch 2023! Change Batch Year to **23**.")
+
 
 # ── Main Header ───────────────────────────────────────────────────────────────
 st.markdown("# 🎓 BEU Insights Master")
@@ -222,13 +229,27 @@ if st.session_state.results_df is not None:
     college_rankings = stats.get('college_rankings', pd.DataFrame())
     branch_rankings = stats.get('branch_rankings', pd.DataFrame())
 
+    # Filter dataset for UI displays if a specific college is selected
+    if college_code != "ALL":
+        df_filtered = df[df["College Code"].astype(str) == str(college_code)].reset_index(drop=True)
+    else:
+        df_filtered = df
+
+    # Compute overview metrics specifically for the filtered subset
+    total_students_f = len(df_filtered)
+    passed_f = df_filtered[df_filtered["Status"].astype(str).str.upper() == "PASS"].shape[0] if not df_filtered.empty else 0
+    failed_f = total_students_f - passed_f
+    pass_rate_f = (passed_f / total_students_f) * 100 if total_students_f > 0 else 0.0
+    avg_sgpa_f = df_filtered["SGPA"].mean() if not df_filtered.empty else 0.0
+    avg_cgpa_f = df_filtered["CGPA"].mean() if not df_filtered.empty else 0.0
+
     # ── Overview Metrics ──────────────────────────────────────────────────────
     m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("👥 Total Students", stats['total_students'])
-    m2.metric("✅ Pass Rate", f"{stats['pass_percentage']:.1f}%")
-    m3.metric("📈 Avg SGPA", f"{stats['avg_sgpa']:.2f}")
-    m4.metric("🏅 Avg CGPA", f"{stats['avg_cgpa']:.2f}")
-    m5.metric("❌ Failed", stats['failed'])
+    m1.metric("👥 Total Students", total_students_f)
+    m2.metric("✅ Pass Rate", f"{pass_rate_f:.1f}%")
+    m3.metric("📈 Avg SGPA", f"{avg_sgpa_f:.2f}")
+    m4.metric("🏅 Avg CGPA", f"{avg_cgpa_f:.2f}")
+    m5.metric("❌ Failed", failed_f)
 
     st.markdown("---")
 
@@ -246,7 +267,7 @@ if st.session_state.results_df is not None:
         c1, c2 = st.columns([2, 1])
         with c1:
             fig_sgpa = px.histogram(
-                df, x="SGPA", nbins=20,
+                df_filtered, x="SGPA", nbins=20,
                 title="SGPA Distribution",
                 color_discrete_sequence=["#3b82f6"],
                 template="plotly_white",
@@ -255,7 +276,7 @@ if st.session_state.results_df is not None:
             st.plotly_chart(fig_sgpa, use_container_width=True)
 
         with c2:
-            status_counts = df["Status"].value_counts().reset_index()
+            status_counts = df_filtered["Status"].value_counts().reset_index()
             status_counts.columns = ["Status", "Count"]
             fig_pie = px.pie(
                 status_counts, values="Count", names="Status",
@@ -266,7 +287,7 @@ if st.session_state.results_df is not None:
             st.plotly_chart(fig_pie, use_container_width=True)
 
         fig_scatter = px.scatter(
-            df, x="CGPA", y="SGPA", color="Status",
+            df_filtered, x="CGPA", y="SGPA", color="Status",
             hover_data=["Student Name", "Registration No"],
             title="Correlation: CGPA vs SGPA",
             template="plotly_white",
@@ -276,7 +297,7 @@ if st.session_state.results_df is not None:
 
         # CGPA distribution
         fig_cgpa = px.histogram(
-            df, x="CGPA", nbins=20,
+            df_filtered, x="CGPA", nbins=20,
             title="CGPA Distribution",
             color_discrete_sequence=["#8b5cf6"],
             template="plotly_white",
@@ -286,7 +307,7 @@ if st.session_state.results_df is not None:
     # ── Tab 2: Leaderboard ────────────────────────────────────────────────────
     with tab_leaderboard:
         st.markdown("### 🌟 Top 3 Podium")
-        toppers = stats.get('toppers', [])[:3]
+        toppers = df_filtered.nsmallest(3, "University Rank").to_dict("records")
         medals = ["🥇", "🥈", "🥉"]
         colors = ["#f59e0b", "#9ca3af", "#b45309"]
         cols = st.columns(3)
@@ -310,7 +331,7 @@ if st.session_state.results_df is not None:
 
         st.markdown("---")
         st.markdown("### 🏅 Top 10 Students")
-        top10 = get_top_students(df, 10)
+        top10 = get_top_students(df_filtered, 10)
         if not top10.empty:
             st.dataframe(top10, use_container_width=True, hide_index=True)
 
@@ -327,7 +348,7 @@ if st.session_state.results_df is not None:
             ["🌐", "🏫", "📚"],
         ):
             rank_key = [k for k in rank_cols if label.split()[0] in k][0]
-            top_row = df[df[rank_key] == 1]
+            top_row = df_filtered[df_filtered[rank_key] == df_filtered[rank_key].min()]
             name = top_row["Student Name"].iloc[0] if not top_row.empty else "N/A"
             col.metric(f"{icon} {label.replace(' #1','')}", name)
 
@@ -335,10 +356,10 @@ if st.session_state.results_df is not None:
             "University Rank", "Branch Rank", "College Rank", "Class Rank",
             "Student Name", "Registration No", "College Name", "Branch",
             "CGPA", "SGPA", "Status",
-        ] if c in df.columns]
+        ] if c in df_filtered.columns]
 
         st.dataframe(
-            df[display_cols].sort_values("University Rank"),
+            df_filtered[display_cols].sort_values("University Rank"),
             use_container_width=True,
             hide_index=True,
             column_config={
@@ -350,6 +371,7 @@ if st.session_state.results_df is not None:
                 "SGPA": st.column_config.NumberColumn("SGPA", format="%.2f"),
             },
         )
+
 
     # ── Tab 4: College Rankings ───────────────────────────────────────────────
     with tab_college:
@@ -442,11 +464,11 @@ if st.session_state.results_df is not None:
         st.markdown("### 🔍 Student Search")
         search_query = st.selectbox(
             "Search by Registration No / Name",
-            options=df["Registration No"].tolist(),
-            format_func=lambda x: f"{x} — {df[df['Registration No'] == x]['Student Name'].values[0]}",
+            options=df_filtered["Registration No"].tolist(),
+            format_func=lambda x: f"{x} — {df_filtered[df_filtered['Registration No'] == x]['Student Name'].values[0]}",
         )
         if search_query:
-            student = df[df["Registration No"] == search_query].iloc[0]
+            student = df_filtered[df_filtered["Registration No"] == search_query].iloc[0]
             status_color = "#10b981" if str(student.get("Status", "")).upper() == "PASS" else "#f87171"
 
             cards_html = "".join([
@@ -482,7 +504,7 @@ if st.session_state.results_df is not None:
             batch = int(reg_no_str[:2]) if len(reg_no_str) >= 2 and reg_no_str[:2].isdigit() else 23
             r_marksheet = BEUApiClient().fetch_result(reg_no_str, student.get('Semester', 'I'), batch, str(student.get('Exam Held', '')))
             
-            subject_grades = [c for c in df.columns if c.startswith("Sub_") and c.endswith("_Grade")]
+            subject_grades = [c for c in df_filtered.columns if c.startswith("Sub_") and c.endswith("_Grade")]
             
             if r_marksheet and r_marksheet.get('raw_html'):
                 target_url = "https://results.beup.ac.in/"
@@ -838,24 +860,24 @@ if st.session_state.results_df is not None:
         with f1:
             status_filter = st.multiselect(
                 "Filter by Status",
-                options=df["Status"].unique().tolist(),
-                default=df["Status"].unique().tolist(),
+                options=df_filtered["Status"].unique().tolist(),
+                default=df_filtered["Status"].unique().tolist(),
                 key="status_filter_data",
             )
         with f2:
             sort_by = st.selectbox("Sort By", ["University Rank", "CGPA", "SGPA", "Student Name", "Registration No"], key="sort_data")
         with f3:
-            if "Branch" in df.columns:
+            if "Branch" in df_filtered.columns:
                 branch_filter = st.multiselect(
                     "Filter by Branch",
-                    options=df["Branch"].dropna().unique().tolist(),
-                    default=df["Branch"].dropna().unique().tolist(),
+                    options=df_filtered["Branch"].dropna().unique().tolist(),
+                    default=df_filtered["Branch"].dropna().unique().tolist(),
                     key="branch_filter_data",
                 )
             else:
                 branch_filter = []
 
-        filtered = df[df["Status"].isin(status_filter)]
+        filtered = df_filtered[df_filtered["Status"].isin(status_filter)]
         if branch_filter and "Branch" in filtered.columns:
             filtered = filtered[filtered["Branch"].isin(branch_filter)]
 
@@ -879,9 +901,9 @@ if st.session_state.results_df is not None:
             "Student Name", "Registration No", "Father Name",
             "College Name", "Branch", "Semester", "Exam Held",
             "SGPA", "CGPA", "Status",
-        ] if c in df.columns]
+        ] if c in df_filtered.columns]
 
-        export_df = df[export_cols].sort_values("University Rank") if "University Rank" in df.columns else df[export_cols]
+        export_df = df_filtered[export_cols].sort_values("University Rank") if "University Rank" in df_filtered.columns else df_filtered[export_cols]
 
         e1, e2 = st.columns(2)
 
@@ -924,7 +946,7 @@ if st.session_state.results_df is not None:
             st.markdown("#### 📊 Excel Download (Multi-Sheet)")
             st.markdown("Includes **Student Results + College Rankings + Branch Rankings + Top 10** in one file.")
             try:
-                excel_bytes = build_excel_report(df, college_rankings, branch_rankings)
+                excel_bytes = build_excel_report(df_filtered, college_rankings, branch_rankings)
                 st.download_button(
                     "⬇️ Download Full Report (Excel)",
                     excel_bytes,
