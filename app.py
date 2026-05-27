@@ -749,328 +749,328 @@ if st.session_state.results_df is not None:
             "🔍 Search Student", "📝 All Data", "📤 Export",
         ])
 
-    # ── Tab 1: Analytics ─────────────────────────────────────────────────────
-    with tab_analytics:
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            fig_sgpa = px.histogram(
-                df_filtered, x="SGPA", nbins=20,
-                title="SGPA Distribution",
-                color_discrete_sequence=["#3b82f6"],
+        # ── Tab 1: Analytics ─────────────────────────────────────────────────────
+        with tab_analytics:
+            c1, c2 = st.columns([2, 1])
+            with c1:
+                fig_sgpa = px.histogram(
+                    df_filtered, x="SGPA", nbins=20,
+                    title="SGPA Distribution",
+                    color_discrete_sequence=["#3b82f6"],
+                    template="plotly_white",
+                )
+                fig_sgpa.update_layout(bargap=0.05)
+                st.plotly_chart(fig_sgpa, use_container_width=True)
+
+            with c2:
+                status_counts = df_filtered["Status"].value_counts().reset_index()
+                status_counts.columns = ["Status", "Count"]
+                fig_pie = px.pie(
+                    status_counts, values="Count", names="Status",
+                    title="Pass vs Fail",
+                    color_discrete_sequence=["#10b981", "#f87171"],
+                    hole=0.45,
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+
+            fig_scatter = px.scatter(
+                df_filtered, x="CGPA", y="SGPA", color="Status",
+                hover_data=["Student Name", "Registration No"],
+                title="Correlation: CGPA vs SGPA",
+                template="plotly_white",
+                color_discrete_map={"PASS": "#10b981", "FAIL": "#f87171"},
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+            # CGPA distribution
+            fig_cgpa = px.histogram(
+                df_filtered, x="CGPA", nbins=20,
+                title="CGPA Distribution",
+                color_discrete_sequence=["#8b5cf6"],
                 template="plotly_white",
             )
-            fig_sgpa.update_layout(bargap=0.05)
-            st.plotly_chart(fig_sgpa, use_container_width=True)
+            st.plotly_chart(fig_cgpa, use_container_width=True)
 
-        with c2:
-            status_counts = df_filtered["Status"].value_counts().reset_index()
-            status_counts.columns = ["Status", "Count"]
-            fig_pie = px.pie(
-                status_counts, values="Count", names="Status",
-                title="Pass vs Fail",
-                color_discrete_sequence=["#10b981", "#f87171"],
-                hole=0.45,
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
+        # ── Tab 2: Leaderboard ────────────────────────────────────────────────────
+        with tab_leaderboard:
+            st.markdown("### 🌟 Top 3 Podium")
+            toppers = df_filtered.nsmallest(3, "University Rank").to_dict("records")
+            medals = ["🥇", "🥈", "🥉"]
+            colors = ["#f59e0b", "#9ca3af", "#b45309"]
+            cols = st.columns(3)
+            for i, topper in enumerate(toppers):
+                with cols[i]:
+                    st.markdown(f"""
+                    <div style="background:white;padding:24px 20px;border-radius:14px;
+                        border:2px solid {colors[i]};text-align:center;
+                        box-shadow:0 4px 16px rgba(0,0,0,0.1);">
+                        <div style="font-size:2.5rem;">{medals[i]}</div>
+                        <h3 style="margin:8px 0 4px;color:#1e293b;">{topper['Student Name']}</h3>
+                        <p style="margin:0;color:#64748b;font-size:0.85rem;">{topper.get('Registration No','')}</p>
+                        <p style="margin:4px 0 0;color:#64748b;font-size:0.8rem;">{topper.get('College Name','')}</p>
+                        <div style="display:flex;justify-content:center;gap:16px;margin-top:12px;">
+                            <div><span style="font-size:0.75rem;color:#94a3b8;">CGPA</span><br>
+                            <b style="font-size:1.2rem;color:{colors[i]};">{topper.get('CGPA','N/A')}</b></div>
+                            <div><span style="font-size:0.75rem;color:#94a3b8;">SGPA</span><br>
+                            <b style="font-size:1.2rem;color:{colors[i]};">{topper.get('SGPA','N/A')}</b></div>
+                        </div>
+                    </div>""", unsafe_allow_html=True)
 
-        fig_scatter = px.scatter(
-            df_filtered, x="CGPA", y="SGPA", color="Status",
-            hover_data=["Student Name", "Registration No"],
-            title="Correlation: CGPA vs SGPA",
-            template="plotly_white",
-            color_discrete_map={"PASS": "#10b981", "FAIL": "#f87171"},
-        )
-        st.plotly_chart(fig_scatter, use_container_width=True)
+            st.markdown("---")
+            st.markdown("### 🏅 Top 10 Students")
+            top10 = get_top_students(df_filtered, 10)
+            if not top10.empty:
+                st.dataframe(top10, use_container_width=True, hide_index=True)
 
-        # CGPA distribution
-        fig_cgpa = px.histogram(
-            df_filtered, x="CGPA", nbins=20,
-            title="CGPA Distribution",
-            color_discrete_sequence=["#8b5cf6"],
-            template="plotly_white",
-        )
-        st.plotly_chart(fig_cgpa, use_container_width=True)
+        # ── Tab 3: Rankings ───────────────────────────────────────────────────────
+        with tab_rankings:
+            st.markdown("### 🎖️ Student Rankings")
+            st.caption("Rankings are computed by SGPA (descending). Ties share the same rank.")
 
-    # ── Tab 2: Leaderboard ────────────────────────────────────────────────────
-    with tab_leaderboard:
-        st.markdown("### 🌟 Top 3 Podium")
-        toppers = df_filtered.nsmallest(3, "University Rank").to_dict("records")
-        medals = ["🥇", "🥈", "🥉"]
-        colors = ["#f59e0b", "#9ca3af", "#b45309"]
-        cols = st.columns(3)
-        for i, topper in enumerate(toppers):
-            with cols[i]:
-                st.markdown(f"""
-                <div style="background:white;padding:24px 20px;border-radius:14px;
-                    border:2px solid {colors[i]};text-align:center;
-                    box-shadow:0 4px 16px rgba(0,0,0,0.1);">
-                    <div style="font-size:2.5rem;">{medals[i]}</div>
-                    <h3 style="margin:8px 0 4px;color:#1e293b;">{topper['Student Name']}</h3>
-                    <p style="margin:0;color:#64748b;font-size:0.85rem;">{topper.get('Registration No','')}</p>
-                    <p style="margin:4px 0 0;color:#64748b;font-size:0.8rem;">{topper.get('College Name','')}</p>
-                    <div style="display:flex;justify-content:center;gap:16px;margin-top:12px;">
-                        <div><span style="font-size:0.75rem;color:#94a3b8;">CGPA</span><br>
-                        <b style="font-size:1.2rem;color:{colors[i]};">{topper.get('CGPA','N/A')}</b></div>
-                        <div><span style="font-size:0.75rem;color:#94a3b8;">SGPA</span><br>
-                        <b style="font-size:1.2rem;color:{colors[i]};">{topper.get('SGPA','N/A')}</b></div>
-                    </div>
-                </div>""", unsafe_allow_html=True)
+            r1, r2, r3 = st.columns(3)
+            rank_cols = ["University Rank", "College Rank", "Class Rank"]
+            for col, label, icon in zip(
+                [r1, r2, r3],
+                ["University Rank #1", "College Rank #1", "Class Rank #1"],
+                ["🌐", "🏫", "📚"],
+            ):
+                rank_key = [k for k in rank_cols if label.split()[0] in k][0]
+                top_row = df_filtered[df_filtered[rank_key] == df_filtered[rank_key].min()]
+                name = top_row["Student Name"].iloc[0] if not top_row.empty else "N/A"
+                col.metric(f"{icon} {label.replace(' #1','')}", name)
 
-        st.markdown("---")
-        st.markdown("### 🏅 Top 10 Students")
-        top10 = get_top_students(df_filtered, 10)
-        if not top10.empty:
-            st.dataframe(top10, use_container_width=True, hide_index=True)
+            display_cols = [c for c in [
+                "University Rank", "Branch Rank", "College Rank", "Class Rank",
+                "Student Name", "Registration No", "College Name", "Branch",
+                "CGPA", "SGPA", "Status",
+            ] if c in df_filtered.columns]
 
-    # ── Tab 3: Rankings ───────────────────────────────────────────────────────
-    with tab_rankings:
-        st.markdown("### 🎖️ Student Rankings")
-        st.caption("Rankings are computed by SGPA (descending). Ties share the same rank.")
-
-        r1, r2, r3 = st.columns(3)
-        rank_cols = ["University Rank", "College Rank", "Class Rank"]
-        for col, label, icon in zip(
-            [r1, r2, r3],
-            ["University Rank #1", "College Rank #1", "Class Rank #1"],
-            ["🌐", "🏫", "📚"],
-        ):
-            rank_key = [k for k in rank_cols if label.split()[0] in k][0]
-            top_row = df_filtered[df_filtered[rank_key] == df_filtered[rank_key].min()]
-            name = top_row["Student Name"].iloc[0] if not top_row.empty else "N/A"
-            col.metric(f"{icon} {label.replace(' #1','')}", name)
-
-        display_cols = [c for c in [
-            "University Rank", "Branch Rank", "College Rank", "Class Rank",
-            "Student Name", "Registration No", "College Name", "Branch",
-            "CGPA", "SGPA", "Status",
-        ] if c in df_filtered.columns]
-
-        st.dataframe(
-            df_filtered[display_cols].sort_values("University Rank"),
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "University Rank": st.column_config.NumberColumn("🌐 Uni Rank", format="%d"),
-                "Branch Rank": st.column_config.NumberColumn("🌿 Branch Rank", format="%d"),
-                "College Rank": st.column_config.NumberColumn("🏫 College Rank", format="%d"),
-                "Class Rank": st.column_config.NumberColumn("📚 Class Rank", format="%d"),
-                "CGPA": st.column_config.NumberColumn("CGPA", format="%.2f"),
-                "SGPA": st.column_config.NumberColumn("SGPA", format="%.2f"),
-            },
-        )
-
-
-    # ── Tab 4: College Rankings ───────────────────────────────────────────────
-    with tab_college:
-        st.markdown("### 🏫 College Performance Rankings")
-        st.caption(
-            "Colleges ranked by average CGPA. "
-            "Data scope: currently fetched students only. "
-            "For full rankings, fetch multiple colleges."
-        )
-        if not college_rankings.empty:
-            cr = college_rankings.copy()
-
-            # Bar chart
-            fig_cr = px.bar(
-                cr.head(20), x="Avg CGPA", y="College Name",
-                orientation="h", color="Avg CGPA",
-                color_continuous_scale="blues",
-                title="College Rankings by Avg CGPA",
-                template="plotly_white",
-                text="Avg CGPA",
-            )
-            fig_cr.update_layout(yaxis={"autorange": "reversed"}, height=max(400, len(cr) * 35))
-            fig_cr.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-            st.plotly_chart(fig_cr, use_container_width=True)
-
-            # Table
             st.dataframe(
-                cr,
+                df_filtered[display_cols].sort_values("University Rank"),
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "College Rank": st.column_config.NumberColumn("🏆 Rank", format="%d"),
-                    "Avg CGPA": st.column_config.NumberColumn(format="%.2f"),
-                    "Avg SGPA": st.column_config.NumberColumn(format="%.2f"),
-                    "Best CGPA": st.column_config.NumberColumn(format="%.2f"),
-                    "Pass %": st.column_config.NumberColumn(format="%.1f%%"),
+                    "University Rank": st.column_config.NumberColumn("🌐 Uni Rank", format="%d"),
+                    "Branch Rank": st.column_config.NumberColumn("🌿 Branch Rank", format="%d"),
+                    "College Rank": st.column_config.NumberColumn("🏫 College Rank", format="%d"),
+                    "Class Rank": st.column_config.NumberColumn("📚 Class Rank", format="%d"),
+                    "CGPA": st.column_config.NumberColumn("CGPA", format="%.2f"),
+                    "SGPA": st.column_config.NumberColumn("SGPA", format="%.2f"),
                 },
             )
-        else:
-            st.info("Fetch students from multiple colleges to see cross-college rankings. Currently only one college is loaded.")
 
-    # ── Tab 5: Branch Rankings ────────────────────────────────────────────────
-    with tab_branch:
-        st.markdown("### 🌿 Branch-Wise Rankings")
-        st.caption("Branch rankings by average CGPA across all fetched students.")
-        if not branch_rankings.empty:
-            br = branch_rankings.copy()
 
-            fig_br = px.bar(
-                br, x="Branch", y="Avg CGPA",
-                color="Avg CGPA",
-                color_continuous_scale="teal",
-                title="Branch Rankings by Avg CGPA",
-                template="plotly_white",
-                text="Avg CGPA",
+        # ── Tab 4: College Rankings ───────────────────────────────────────────────
+        with tab_college:
+            st.markdown("### 🏫 College Performance Rankings")
+            st.caption(
+                "Colleges ranked by average CGPA. "
+                "Data scope: currently fetched students only. "
+                "For full rankings, fetch multiple colleges."
             )
-            fig_br.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-            fig_br.update_layout(xaxis_tickangle=-30)
-            st.plotly_chart(fig_br, use_container_width=True)
+            if not college_rankings.empty:
+                cr = college_rankings.copy()
 
-            # Pass % chart
-            fig_pass = px.bar(
-                br, x="Branch", y="Pass %",
-                color="Pass %",
-                color_continuous_scale="greens",
-                title="Branch-Wise Pass Percentage",
-                template="plotly_white",
-                text="Pass %",
-            )
-            fig_pass.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
-            st.plotly_chart(fig_pass, use_container_width=True)
+                # Bar chart
+                fig_cr = px.bar(
+                    cr.head(20), x="Avg CGPA", y="College Name",
+                    orientation="h", color="Avg CGPA",
+                    color_continuous_scale="blues",
+                    title="College Rankings by Avg CGPA",
+                    template="plotly_white",
+                    text="Avg CGPA",
+                )
+                fig_cr.update_layout(yaxis={"autorange": "reversed"}, height=max(400, len(cr) * 35))
+                fig_cr.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+                st.plotly_chart(fig_cr, use_container_width=True)
 
-            st.dataframe(
-                br,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Branch Rank": st.column_config.NumberColumn("🏆 Rank", format="%d"),
-                    "Avg CGPA": st.column_config.NumberColumn(format="%.2f"),
-                    "Avg SGPA": st.column_config.NumberColumn(format="%.2f"),
-                    "Best CGPA": st.column_config.NumberColumn(format="%.2f"),
-                    "Pass %": st.column_config.NumberColumn(format="%.1f%%"),
-                },
-            )
-        else:
-            st.info("No branch data available yet.")
-
-    # ── Tab 6: Search Student ─────────────────────────────────────────────────
-    with tab_search:
-        st.markdown("### 🔍 Student Search")
-        search_query = st.selectbox(
-            "Search by Registration No / Name",
-            options=df_filtered["Registration No"].tolist(),
-            format_func=lambda x: f"{x} — {df_filtered[df_filtered['Registration No'] == x]['Student Name'].values[0]}",
-        )
-        if search_query:
-            student = df_filtered[df_filtered["Registration No"] == search_query].iloc[0]
-            render_student_scorecard(student, df_filtered)
-
-
-    # ── Tab 7: All Data ───────────────────────────────────────────────────────
-
-    with tab_data:
-        st.markdown("#### Filter & Explore Data")
-        f1, f2, f3 = st.columns(3)
-        with f1:
-            status_filter = st.multiselect(
-                "Filter by Status",
-                options=df_filtered["Status"].unique().tolist(),
-                default=df_filtered["Status"].unique().tolist(),
-                key="status_filter_data",
-            )
-        with f2:
-            sort_by = st.selectbox("Sort By", ["University Rank", "CGPA", "SGPA", "Student Name", "Registration No"], key="sort_data")
-        with f3:
-            if "Branch" in df_filtered.columns:
-                branch_filter = st.multiselect(
-                    "Filter by Branch",
-                    options=df_filtered["Branch"].dropna().unique().tolist(),
-                    default=df_filtered["Branch"].dropna().unique().tolist(),
-                    key="branch_filter_data",
+                # Table
+                st.dataframe(
+                    cr,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "College Rank": st.column_config.NumberColumn("🏆 Rank", format="%d"),
+                        "Avg CGPA": st.column_config.NumberColumn(format="%.2f"),
+                        "Avg SGPA": st.column_config.NumberColumn(format="%.2f"),
+                        "Best CGPA": st.column_config.NumberColumn(format="%.2f"),
+                        "Pass %": st.column_config.NumberColumn(format="%.1f%%"),
+                    },
                 )
             else:
-                branch_filter = []
+                st.info("Fetch students from multiple colleges to see cross-college rankings. Currently only one college is loaded.")
 
-        filtered = df_filtered[df_filtered["Status"].isin(status_filter)]
-        if branch_filter and "Branch" in filtered.columns:
-            filtered = filtered[filtered["Branch"].isin(branch_filter)]
-
-        if sort_by == "University Rank":
-            filtered = filtered.sort_values("University Rank")
-        elif sort_by in ("CGPA", "SGPA"):
-            filtered = filtered.sort_values(sort_by, ascending=False)
-        elif sort_by == "Student Name":
-            filtered = filtered.sort_values("Student Name")
-
-        st.dataframe(filtered, use_container_width=True, height=600)
-
-    # ── Tab 8: Export ─────────────────────────────────────────────────────────
-    with tab_export:
-        st.markdown("### 📤 Download Data")
-        st.markdown("Download the complete student results with rankings in your preferred format.")
-
-        # Prepare export columns
-        export_cols = [c for c in [
-            "University Rank", "Branch Rank", "College Rank", "Class Rank",
-            "Student Name", "Registration No", "Father Name",
-            "College Name", "Branch", "Semester", "Exam Held",
-            "SGPA", "CGPA", "Status",
-        ] if c in df_filtered.columns]
-
-        export_df = df_filtered[export_cols].sort_values("University Rank") if "University Rank" in df_filtered.columns else df_filtered[export_cols]
-
-        e1, e2 = st.columns(2)
-
-        with e1:
-            st.markdown("#### 📄 CSV Download")
-            st.markdown("Basic format. Opens in any spreadsheet.")
-            csv_data = export_df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "⬇️ Download Student Results (CSV)",
-                csv_data,
-                f"beu_results_batch{batch_year}_sem{semester_num}.csv",
-                "text/csv",
-                key="dl-csv",
-                use_container_width=True,
-            )
-
-            if not college_rankings.empty:
-                cr_csv = college_rankings.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    "🏫 Download College Rankings (CSV)",
-                    cr_csv,
-                    "beu_college_rankings.csv",
-                    "text/csv",
-                    key="dl-college-csv",
-                    use_container_width=True,
-                )
-
+        # ── Tab 5: Branch Rankings ────────────────────────────────────────────────
+        with tab_branch:
+            st.markdown("### 🌿 Branch-Wise Rankings")
+            st.caption("Branch rankings by average CGPA across all fetched students.")
             if not branch_rankings.empty:
-                br_csv = branch_rankings.to_csv(index=False).encode("utf-8")
+                br = branch_rankings.copy()
+
+                fig_br = px.bar(
+                    br, x="Branch", y="Avg CGPA",
+                    color="Avg CGPA",
+                    color_continuous_scale="teal",
+                    title="Branch Rankings by Avg CGPA",
+                    template="plotly_white",
+                    text="Avg CGPA",
+                )
+                fig_br.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+                fig_br.update_layout(xaxis_tickangle=-30)
+                st.plotly_chart(fig_br, use_container_width=True)
+
+                # Pass % chart
+                fig_pass = px.bar(
+                    br, x="Branch", y="Pass %",
+                    color="Pass %",
+                    color_continuous_scale="greens",
+                    title="Branch-Wise Pass Percentage",
+                    template="plotly_white",
+                    text="Pass %",
+                )
+                fig_pass.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+                st.plotly_chart(fig_pass, use_container_width=True)
+
+                st.dataframe(
+                    br,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Branch Rank": st.column_config.NumberColumn("🏆 Rank", format="%d"),
+                        "Avg CGPA": st.column_config.NumberColumn(format="%.2f"),
+                        "Avg SGPA": st.column_config.NumberColumn(format="%.2f"),
+                        "Best CGPA": st.column_config.NumberColumn(format="%.2f"),
+                        "Pass %": st.column_config.NumberColumn(format="%.1f%%"),
+                    },
+                )
+            else:
+                st.info("No branch data available yet.")
+
+        # ── Tab 6: Search Student ─────────────────────────────────────────────────
+        with tab_search:
+            st.markdown("### 🔍 Student Search")
+            search_query = st.selectbox(
+                "Search by Registration No / Name",
+                options=df_filtered["Registration No"].tolist(),
+                format_func=lambda x: f"{x} — {df_filtered[df_filtered['Registration No'] == x]['Student Name'].values[0]}",
+            )
+            if search_query:
+                student = df_filtered[df_filtered["Registration No"] == search_query].iloc[0]
+                render_student_scorecard(student, df_filtered)
+
+
+        # ── Tab 7: All Data ───────────────────────────────────────────────────────
+
+        with tab_data:
+            st.markdown("#### Filter & Explore Data")
+            f1, f2, f3 = st.columns(3)
+            with f1:
+                status_filter = st.multiselect(
+                    "Filter by Status",
+                    options=df_filtered["Status"].unique().tolist(),
+                    default=df_filtered["Status"].unique().tolist(),
+                    key="status_filter_data",
+                )
+            with f2:
+                sort_by = st.selectbox("Sort By", ["University Rank", "CGPA", "SGPA", "Student Name", "Registration No"], key="sort_data")
+            with f3:
+                if "Branch" in df_filtered.columns:
+                    branch_filter = st.multiselect(
+                        "Filter by Branch",
+                        options=df_filtered["Branch"].dropna().unique().tolist(),
+                        default=df_filtered["Branch"].dropna().unique().tolist(),
+                        key="branch_filter_data",
+                    )
+                else:
+                    branch_filter = []
+
+            filtered = df_filtered[df_filtered["Status"].isin(status_filter)]
+            if branch_filter and "Branch" in filtered.columns:
+                filtered = filtered[filtered["Branch"].isin(branch_filter)]
+
+            if sort_by == "University Rank":
+                filtered = filtered.sort_values("University Rank")
+            elif sort_by in ("CGPA", "SGPA"):
+                filtered = filtered.sort_values(sort_by, ascending=False)
+            elif sort_by == "Student Name":
+                filtered = filtered.sort_values("Student Name")
+
+            st.dataframe(filtered, use_container_width=True, height=600)
+
+        # ── Tab 8: Export ─────────────────────────────────────────────────────────
+        with tab_export:
+            st.markdown("### 📤 Download Data")
+            st.markdown("Download the complete student results with rankings in your preferred format.")
+
+            # Prepare export columns
+            export_cols = [c for c in [
+                "University Rank", "Branch Rank", "College Rank", "Class Rank",
+                "Student Name", "Registration No", "Father Name",
+                "College Name", "Branch", "Semester", "Exam Held",
+                "SGPA", "CGPA", "Status",
+            ] if c in df_filtered.columns]
+
+            export_df = df_filtered[export_cols].sort_values("University Rank") if "University Rank" in df_filtered.columns else df_filtered[export_cols]
+
+            e1, e2 = st.columns(2)
+
+            with e1:
+                st.markdown("#### 📄 CSV Download")
+                st.markdown("Basic format. Opens in any spreadsheet.")
+                csv_data = export_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
-                    "🌿 Download Branch Rankings (CSV)",
-                    br_csv,
-                    "beu_branch_rankings.csv",
+                    "⬇️ Download Student Results (CSV)",
+                    csv_data,
+                    f"beu_results_batch{batch_year}_sem{semester_num}.csv",
                     "text/csv",
-                    key="dl-branch-csv",
+                    key="dl-csv",
                     use_container_width=True,
                 )
 
-        with e2:
-            st.markdown("#### 📊 Excel Download (Multi-Sheet)")
-            st.markdown("Includes **Student Results + College Rankings + Branch Rankings + Top 10** in one file.")
-            try:
-                excel_bytes = build_excel_report(df_filtered, college_rankings, branch_rankings)
-                st.download_button(
-                    "⬇️ Download Full Report (Excel)",
-                    excel_bytes,
-                    f"beu_full_report_batch{batch_year}_sem{semester_num}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl-excel",
-                    use_container_width=True,
-                )
-            except ImportError:
-                st.warning("Install `openpyxl` to enable Excel export: `pip install openpyxl`")
-            except Exception as e:
-                st.error(f"Excel export error: {e}")
+                if not college_rankings.empty:
+                    cr_csv = college_rankings.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        "🏫 Download College Rankings (CSV)",
+                        cr_csv,
+                        "beu_college_rankings.csv",
+                        "text/csv",
+                        key="dl-college-csv",
+                        use_container_width=True,
+                    )
 
-        st.markdown("---")
-        st.markdown("#### 📋 Data Preview")
-        st.markdown(f"**{len(export_df)} students** | **{len(export_df.columns)} columns**")
-        st.dataframe(export_df.head(10), use_container_width=True, hide_index=True)
+                if not branch_rankings.empty:
+                    br_csv = branch_rankings.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        "🌿 Download Branch Rankings (CSV)",
+                        br_csv,
+                        "beu_branch_rankings.csv",
+                        "text/csv",
+                        key="dl-branch-csv",
+                        use_container_width=True,
+                    )
+
+            with e2:
+                st.markdown("#### 📊 Excel Download (Multi-Sheet)")
+                st.markdown("Includes **Student Results + College Rankings + Branch Rankings + Top 10** in one file.")
+                try:
+                    excel_bytes = build_excel_report(df_filtered, college_rankings, branch_rankings)
+                    st.download_button(
+                        "⬇️ Download Full Report (Excel)",
+                        excel_bytes,
+                        f"beu_full_report_batch{batch_year}_sem{semester_num}.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="dl-excel",
+                        use_container_width=True,
+                    )
+                except ImportError:
+                    st.warning("Install `openpyxl` to enable Excel export: `pip install openpyxl`")
+                except Exception as e:
+                    st.error(f"Excel export error: {e}")
+
+            st.markdown("---")
+            st.markdown("#### 📋 Data Preview")
+            st.markdown(f"**{len(export_df)} students** | **{len(export_df.columns)} columns**")
+            st.dataframe(export_df.head(10), use_container_width=True, hide_index=True)
 
 else:
     # Landing state (Quick Rank Checker UI)
