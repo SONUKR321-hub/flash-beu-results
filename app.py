@@ -8,8 +8,18 @@ import os
 import time
 from io import BytesIO
 
+import importlib
+
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+
+# Force reload backend modules to clear Streamlit's cache
+if 'backend.api_client' in sys.modules:
+    importlib.reload(sys.modules['backend.api_client'])
+if 'backend.data_processing' in sys.modules:
+    importlib.reload(sys.modules['backend.data_processing'])
+if 'backend.constants' in sys.modules:
+    importlib.reload(sys.modules['backend.constants'])
 
 from backend.api_client import BEUApiClient
 from backend.data_processing import (
@@ -22,6 +32,7 @@ from backend.constants import (
     BRANCH_CODES, COLLEGE_CODES, COLLEGE_LOCATIONS,
     SEMESTERS, SEMESTER_MAPPING, BRANCH_SHORT_NAMES,
 )
+
 
 # ── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
