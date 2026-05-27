@@ -666,7 +666,7 @@ if st.session_state.results_df is not None:
     # Check if we are in the Quick Search mode
     if st.session_state.quick_search_reg is not None and not st.session_state.show_full_analytics:
         # 1. Quick Scorecard mode
-        student_rows = df[df["Registration No"] == st.session_state.quick_search_reg]
+        student_rows = df[df["Registration No"].astype(str).str.strip() == str(st.session_state.quick_search_reg).strip()]
         if not student_rows.empty:
             student = student_rows.iloc[0]
             
@@ -952,10 +952,10 @@ if st.session_state.results_df is not None:
             search_query = st.selectbox(
                 "Search by Registration No / Name",
                 options=df_filtered["Registration No"].tolist(),
-                format_func=lambda x: f"{x} — {df_filtered[df_filtered['Registration No'] == x]['Student Name'].values[0]}",
+                format_func=lambda x: f"{x} — {df_filtered[df_filtered['Registration No'].astype(str).str.strip() == str(x).strip()]['Student Name'].values[0]}",
             )
             if search_query:
-                student = df_filtered[df_filtered["Registration No"] == search_query].iloc[0]
+                student = df_filtered[df_filtered["Registration No"].astype(str).str.strip() == str(search_query).strip()].iloc[0]
                 render_student_scorecard(student, df_filtered)
 
 
@@ -1186,7 +1186,7 @@ else:
                         )
                         
                         # Make sure our searched student's result is in the collection (handles edge case rolls > 60)
-                        if not any(r.get("redg_no") == reg_input for r in raw_results):
+                        if not any(str(r.get("redg_no")).strip() == reg_input.strip() for r in raw_results):
                             raw_results.append(student_res)
                             
                         # Process and compute ranks
@@ -1195,7 +1195,7 @@ else:
                         st.session_state.batch_stats = analyze_batch_performance(df)
                         
                         # Set search variables to switch view
-                        st.session_state.quick_search_reg = reg_input
+                        st.session_state.quick_search_reg = reg_input.strip()
                         st.session_state.quick_search_sem = semester_roman
                         st.session_state.quick_search_exam = exam_held
                         st.session_state.show_full_analytics = False
