@@ -56,6 +56,7 @@ def stat_card(label, value, bg="rgba(255,255,255,0.12)"):
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("🎓 Config Panel")
+    st.caption("⚡ Version: **1.1.0 (Token Fix)**")
 
     st.markdown("### Batch Details")
     batch_year = st.number_input("Batch Year (e.g. 23 for 2023)", min_value=15, max_value=30, value=22)
