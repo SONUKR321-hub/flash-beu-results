@@ -14,7 +14,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://www.beu-bih.ac.in/backend/v1/result/get-result"
+BASE_URL = "https://beu-bih.ac.in/backend/v1/result/get-result"
+TOKEN_URL = "https://beu-bih.ac.in/backend/v1/result/token"
 
 class BEUApiClient:
     def __init__(self):
@@ -23,7 +24,7 @@ class BEUApiClient:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://www.beu-bih.ac.in/',
+            'Referer': 'https://beu-bih.ac.in/result-one',
         })
 
     def fetch_result(self, registration_no: str, semester: str, batch_year: int, exam_held: str) -> Optional[Dict[str, Any]]:
@@ -46,15 +47,32 @@ class BEUApiClient:
         except Exception:
             pass
 
+        # 1. Fetch a fresh single-use token from the BEU API
+        token = None
+        try:
+            r_token = self.session.get(TOKEN_URL, timeout=10)
+            if r_token.status_code == 200:
+                token = r_token.json().get("token")
+            else:
+                logger.error(f"Failed to fetch token: {r_token.status_code} - {r_token.text}")
+        except Exception as e:
+            logger.error(f"Error fetching token: {e}")
+
+        if not token:
+            logger.warning(f"Could not proceed for {registration_no} due to missing token.")
+            return None
+
+        # 2. Fetch result using the single-use token
         params = {
             "year": batch_year,
             "redg_no": registration_no,
             "semester": semester,
-            "exam_held": exam_held
+            "exam_held": exam_held,
+            "token": token
         }
 
-        # Debug: Print the exact URL being requested
-        print(f"DEBUG FETCH: {BASE_URL} params={params}")
+        # Debug: Print the exact URL being requested (excluding raw token details for brevity)
+        print(f"DEBUG FETCH: {BASE_URL} params={{'year': {batch_year}, 'redg_no': {registration_no}, 'semester': '{semester}', 'exam_held': '{exam_held}', 'token': '...'}}")
 
         try:
             response = self.session.get(BASE_URL, params=params, timeout=10)
@@ -74,6 +92,7 @@ class BEUApiClient:
         except requests.RequestException as e:
             logger.warning(f"Request failed for {registration_no}: {e}")
             return None
+
 
     def fetch_batch_results(
         self, 
