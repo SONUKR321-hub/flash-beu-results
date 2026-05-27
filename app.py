@@ -1075,9 +1075,9 @@ if st.session_state.results_df is not None:
 else:
     # Landing state (Quick Rank Checker UI)
     st.markdown("""
-    <div style="background:rgba(255, 255, 255, 0.05);padding:30px;border-radius:16px;border:1px solid rgba(255, 255, 255, 0.1);max-width:800px;margin:20px auto;box-shadow:0 8px 32px 0 rgba(31,38,135,0.2);">
+    <div style="background:rgba(255, 255, 255, 0.05);padding:30px;border-radius:16px;border:1px solid rgba(255, 255, 255, 0.1);max-width:800px;margin:20px auto;box-shadow:0 8px 32px 0 rgba(31,38,135,0.2);color:inherit;">
         <h2 style="color:#3b82f6;margin:0 0 8px;text-align:center;">🔍 Quick Rank & Marksheet Checker</h2>
-        <p style="color:#ccc;font-size:1rem;margin:0 0 20px;text-align:center;line-height:1.5;">
+        <p style="color:inherit;opacity:0.85;font-size:1rem;margin:0 0 20px;text-align:center;line-height:1.5;">
             Enter your 11-digit BEU Registration Number to view your comparative ranks (University, Branch, College, and Class) and access your official marksheet.
         </p>
     </div>
@@ -1107,10 +1107,10 @@ else:
             st.markdown(f"""
             <div style="background:rgba(16, 185, 129, 0.1);padding:15px;border-radius:10px;margin:15px 0;border:1px solid rgba(16, 185, 129, 0.2);">
                 <span style="color:#10b981;font-weight:bold;font-size:1.1rem;">✅ Registration Details Detected:</span>
-                <table style="width:100%; border:none; margin:10px 0 0 0; background:transparent;">
-                    <tr style="background:transparent;"><td style="border:none;padding:4px;font-weight:bold;width:25%;color:#aaa;">Batch Year:</td><td style="border:none;padding:4px;color:#fff;">20{batch_year_val}</td></tr>
-                    <tr style="background:transparent;"><td style="border:none;padding:4px;font-weight:bold;color:#aaa;">Branch/Course:</td><td style="border:none;padding:4px;color:#fff;">{branch_name} ({branch_code_val})</td></tr>
-                    <tr style="background:transparent;"><td style="border:none;padding:4px;font-weight:bold;color:#aaa;">College:</td><td style="border:none;padding:4px;color:#fff;">{college_name} ({college_code_val})</td></tr>
+                <table style="width:100%; border:none; margin:10px 0 0 0; background:transparent; color:inherit;">
+                    <tr style="background:transparent;"><td style="border:none;padding:4px;font-weight:bold;width:25%;opacity:0.7;">Batch Year:</td><td style="border:none;padding:4px;font-weight:bold;">20{batch_year_val}</td></tr>
+                    <tr style="background:transparent;"><td style="border:none;padding:4px;font-weight:bold;opacity:0.7;">Branch/Course:</td><td style="border:none;padding:4px;font-weight:bold;">{branch_name} ({branch_code_val})</td></tr>
+                    <tr style="background:transparent;"><td style="border:none;padding:4px;font-weight:bold;opacity:0.7;">College:</td><td style="border:none;padding:4px;font-weight:bold;">{college_name} ({college_code_val})</td></tr>
                 </table>
             </div>
             """, unsafe_allow_html=True)
@@ -1207,21 +1207,21 @@ else:
                 st.warning("⚠️ Please enter a valid 11-digit numeric Registration Number (e.g. 22101107001).")
             else:
                 st.markdown("""
-                <div style="margin-top:20px;display:flex;justify-content:center;gap:20px;flex-wrap:wrap;">
-                    <div style="background:rgba(255,255,255,0.02);padding:15px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);min-width:180px;text-align:center;">
+                <div style="margin-top:20px;display:flex;justify-content:center;gap:20px;flex-wrap:wrap;color:inherit;">
+                    <div style="background:rgba(255,255,255,0.02);padding:15px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);min-width:180px;text-align:center;color:inherit;">
                         <span style="font-size:1.5rem;">🌐</span>
-                        <h4 style="margin:8px 0 4px;color:#fff;">University Ranking</h4>
-                        <p style="margin:0;font-size:0.8rem;color:#777;">Compare against all colleges</p>
+                        <h4 style="margin:8px 0 4px;color:inherit;">University Ranking</h4>
+                        <p style="margin:0;font-size:0.8rem;color:inherit;opacity:0.7;">Compare against all colleges</p>
                     </div>
-                    <div style="background:rgba(255,255,255,0.02);padding:15px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);min-width:180px;text-align:center;">
+                    <div style="background:rgba(255,255,255,0.02);padding:15px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);min-width:180px;text-align:center;color:inherit;">
                         <span style="font-size:1.5rem;">🌿</span>
-                        <h4 style="margin:8px 0 4px;color:#fff;">Branch Ranking</h4>
-                        <p style="margin:0;font-size:0.8rem;color:#777;">See standing in your branch</p>
+                        <h4 style="margin:8px 0 4px;color:inherit;">Branch Ranking</h4>
+                        <p style="margin:0;font-size:0.8rem;color:inherit;opacity:0.7;">See standing in your branch</p>
                     </div>
-                    <div style="background:rgba(255,255,255,0.02);padding:15px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);min-width:180px;text-align:center;">
+                    <div style="background:rgba(255,255,255,0.02);padding:15px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);min-width:180px;text-align:center;color:inherit;">
                         <span style="font-size:1.5rem;">🏫</span>
-                        <h4 style="margin:8px 0 4px;color:#fff;">College Ranking</h4>
-                        <p style="margin:0;font-size:0.8rem;color:#777;">Find rank in your college</p>
+                        <h4 style="margin:8px 0 4px;color:inherit;">College Ranking</h4>
+                        <p style="margin:0;font-size:0.8rem;color:inherit;opacity:0.7;">Find rank in your college</p>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
