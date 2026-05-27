@@ -195,3 +195,54 @@ body {
         font-size: 0.9rem;
     }
 }
+
+/* ── Premium Mobile & UI Enhancements ── */
+
+/* Glassmorphism styling for Streamlit base components */
+div[data-baseweb="input"], div[data-baseweb="select"], .stSelectbox > div {
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, .stSelectbox > div:focus-within {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 14px rgba(59, 130, 246, 0.25) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Custom rounded styling for Streamlit Buttons */
+div.stButton > button {
+    border-radius: 12px !important;
+    padding: 10px 20px !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    transition: all 0.25s ease !important;
+}
+
+/* Beautiful scorecard flex layout */
+.scorecard-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+    margin-top: 15px;
+}
+
+/* Responsive columns on mobile */
+@media (max-width: 600px) {
+    div.stButton > button {
+        width: 100% !important;
+        padding: 10px 15px !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Metrics grid representation on mobile screen */
+    [data-testid="stMetricContainer"] {
+        padding: 0.6rem !important;
+        margin-bottom: 0.3rem !important;
+    }
+}

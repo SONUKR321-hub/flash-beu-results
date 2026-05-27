@@ -99,11 +99,11 @@ def get_exams_for_batch(batch_year: int):
 
 
 # ── Helper: Stat Card HTML ────────────────────────────────────────────────────
-def stat_card(label, value, bg="rgba(255,255,255,0.12)"):
+def stat_card(label, value, bg="rgba(255,255,255,0.1)"):
     return f"""
-    <div style="background:{bg};padding:12px 20px;border-radius:10px;min-width:110px;text-align:center;">
-        <p style="margin:0;font-size:0.75rem;opacity:0.8;text-transform:uppercase;letter-spacing:.05em;">{label}</p>
-        <h3 style="margin:4px 0 0;color:white;font-size:1.3rem;">{value}</h3>
+    <div style="background:{bg};padding:12px 14px;border-radius:12px;text-align:center;box-shadow:0 4px 10px rgba(0,0,0,0.1);border:1px solid rgba(255,255,255,0.06);flex:1 1 calc(33.33% - 8px);min-width:90px;">
+        <p style="margin:0;font-size:0.7rem;opacity:0.75;text-transform:uppercase;letter-spacing:.05em;color:white;">{label}</p>
+        <h3 style="margin:4px 0 0;color:white;font-size:1.15rem;font-weight:700;">{value}</h3>
     </div>"""
 
 # ── Helper: Fetch Semester SGPA with cache ─────────────────────────────────────
@@ -334,6 +334,12 @@ def render_student_scorecard(student, df_filtered):
 .info-table th, .info-table td {{ padding: 8px 10px; border: 1px solid #000; }}
 .info-table td.label-col {{ width: 15%; font-weight: bold; text-align: left; }}
 .info-table td.data-col {{ text-align: left; }}
+@media screen and (max-width: 600px) {{
+  #printarea {{ padding: 10px 5px !important; font-size: 11px !important; }}
+  #printarea th, #printarea td {{ padding: 5px 3px !important; font-size: 10px !important; }}
+  .info-table th, .info-table td {{ padding: 4px 5px !important; }}
+  .info-table td.label-col {{ width: 30% !important; }}
+}}
 @media print {{
   .stApp>header, .stSidebar, div[data-testid="stToolbar"], div[data-testid="stDecoration"], .stButton, footer {{ display: none !important; }}
   #printarea {{ border: none; width: 100%; max-width: none; padding: 0; }}
